@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="200" viewBox="0 0 800 200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f0f0f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00d4aa;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#7c3aed;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f472b6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="subtitleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#94a3b8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#cbd5e1;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="200" rx="12" fill="url(#bg)"/>
+  <text x="400" y="105" font-family="'SF Pro Display', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="72" font-weight="800" fill="url(#textGrad)" text-anchor="middle" letter-spacing="6">OVERTONE</text>
+  <text x="400" y="148" font-family="'SF Pro Text', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" fill="url(#subtitleGrad)" text-anchor="middle" letter-spacing="4">YOUR AI PRESENTATION AGENT</text>
+  <circle cx="60" cy="100" r="3" fill="#00d4aa" opacity="0.4"/>
+  <circle cx="740" cy="100" r="3" fill="#f472b6" opacity="0.4"/>
+  <circle cx="120" cy="50" r="2" fill="#7c3aed" opacity="0.3"/>
+  <circle cx="680" cy="150" r="2" fill="#00d4aa" opacity="0.3"/>
+</svg>
