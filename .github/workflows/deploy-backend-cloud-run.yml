@@ -1,5 +1,5 @@
-# Build and deploy the FastAPI backend to Cloud Run.
-# Configure GitHub repository Variables + Secret (see DEPLOY.md).
+# Optional: deploy from GitHub Actions (requires GCP_SA_KEY + Variables in GitHub).
+# Prefer Cloud Build + repo connection in GCP Console — see DEPLOY.md and cloudbuild.yaml (no GitHub secrets).
 name: Deploy backend to Cloud Run
 
 on:

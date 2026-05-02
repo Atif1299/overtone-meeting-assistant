@@ -1,0 +1,39 @@
+# Cloud Build: build backend image and deploy to Cloud Run.
+# Use with a trigger: GCP Console → Cloud Build → Triggers → Connect GitHub repository.
+# No GitHub Actions secrets required — Google pulls your repo after one-time OAuth.
+#
+# Override defaults in the trigger: Edit trigger → Substitution variables (_REGION, _SERVICE, …)
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE: overtone-backend
+  _AR_REPOSITORY: overtone
+  _IMAGE_NAME: overtone-backend
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
+      - ./backend
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+
+options:
+  logging: CLOUD_LOGGING_ONLY

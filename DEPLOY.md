@@ -1,74 +1,69 @@
 # Deploy Overtone backend to Google Cloud Run
 
-This repository includes a Docker image for the FastAPI app in `backend/` (see `backend/Dockerfile`). The container listens on **`PORT`** (Cloud Run sets this; default `8080`).
+The API is containerized in `backend/` (`backend/Dockerfile`). The process listens on **`PORT`** (Cloud Run sets it; default `8080` in the image).
 
-## 1. Push this project to your GitHub repo
+---
 
-From your machine (replace paths if needed):
+## How CI/CD fits together
 
-```bash
-cd /path/to/overtone
-git remote add myrepo https://github.com/Atif1299/overtone-meeting-assistant.git
-git fetch myrepo
-git push -u myrepo HEAD:main
-```
+| Approach | Where you click “connect repo” | Secrets in GitHub? |
+|----------|--------------------------------|--------------------|
+| **A. Cloud Build trigger (recommended)** | **Google Cloud Console** — connect GitHub once (OAuth) | **No** GCP key in GitHub |
+| **B. GitHub Actions** | GitHub runs the workflow | **Yes** — `GCP_SA_KEY` + Variables |
 
-If `main` already exists on the remote with different history, use `--force-with-lease` only if you intend to overwrite it.
+Cloud Run does **not** poll GitHub by itself. Either **Cloud Build** (Google pulls the repo) or **GitHub Actions** (GitHub pushes to GCP) runs the build. For fewer steps in GitHub Settings, use **A**.
 
-Authenticate with GitHub using **HTTPS + personal access token**, **SSH keys**, or **GitHub CLI** (`gh auth login`).
+---
 
-## 2. Google Cloud setup (once per project)
+## A. Connect the repo in GCP (no GitHub secrets)
 
-1. Create or pick a **GCP project** and enable billing.
-2. Enable APIs: **Artifact Registry**, **Cloud Run**, **Cloud Build** (optional if you only use GitHub Actions to build).
-3. Create an **Artifact Registry** repository (Docker), e.g. name `overtone`, region `us-central1`.
-4. Create a **service account** for CI with roles, for example:
-   - `roles/run.admin`
-   - `roles/artifactregistry.writer`
-   - `roles/iam.serviceAccountUser` (on the Cloud Run runtime SA if needed)
-5. Create a **JSON key** for that service account (or use Workload Identity Federation for production). In GitHub: **Settings → Secrets and variables → Actions**, add secret **`GCP_SA_KEY`** with the full JSON file contents.
+1. Push this repository to GitHub (your account), e.g. `Atif1299/overtone-meeting-assistant`.
+2. In **Google Cloud Console**: enable **Cloud Build API**, **Artifact Registry API**, **Cloud Run API**.
+3. Create an **Artifact Registry** Docker repository (e.g. name `overtone`, same region you will use for Cloud Run).
+4. **Cloud Build → Repositories → Connect repository** → choose **GitHub (Cloud Build GitHub App)** → authorize and select your repo.
+5. **Cloud Build → Triggers → Create trigger**:
+   - Event: Push to branch `main` (or your branch).
+   - Build configuration: **Cloud Build configuration file** → path `cloudbuild.yaml`.
+   - Substitution variables (optional): override `_REGION`, `_SERVICE`, `_AR_REPOSITORY`, `_IMAGE_NAME` to match your project (defaults are at the top of [cloudbuild.yaml](cloudbuild.yaml)).
+6. Grant the **Cloud Build service account** permission to push images and deploy:
+   - **Artifact Registry**: `Artifact Registry Writer` on the repo (or project).
+   - **Cloud Run**: `Cloud Run Admin` and **Service Account User** on the Cloud Run runtime service account (so it can deploy new revisions).
 
-## 3. GitHub Actions variables
+On each push to the configured branch, Cloud Build runs `cloudbuild.yaml`: builds `./backend`, pushes the image to Artifact Registry, and deploys to Cloud Run.
 
-In the same repository: **Settings → Secrets and variables → Actions → Variables**, add:
+**App secrets** (`OPENAI_API_KEY`, `DATABASE_URL`, etc.) are **not** in GitHub — set them once on the **Cloud Run service** (or **Secret Manager** + reference in Cloud Run). That is the same no matter which CI option you use.
 
-| Variable | Example |
-|----------|---------|
-| `GCP_PROJECT_ID` | `my-project-123` |
-| `GCP_REGION` | `us-central1` |
-| `GCP_ARTIFACT_REPOSITORY` | `overtone` |
-| `GCP_ARTIFACT_IMAGE_NAME` | `overtone-backend` |
-| `CLOUD_RUN_SERVICE` | `overtone-backend` |
+---
 
-Workflow file: `.github/workflows/deploy-backend-cloud-run.yml` (runs on push to `main` when `backend/` changes, or **Run workflow** manually).
+## B. GitHub Actions (optional)
 
-## 4. Cloud Run service configuration
+If you prefer the pipeline to run on GitHub’s runners, use `.github/workflows/deploy-backend-cloud-run.yml` and add:
 
-After the first deploy, open **Cloud Run → your service → Edit & deploy new revision** and set environment variables and secrets (or use **Secret Manager** references). At minimum align with `backend/.env.example`:
+- Secret: **`GCP_SA_KEY`** (JSON for a CI service account).
+- Variables: `GCP_PROJECT_ID`, `GCP_REGION`, `GCP_ARTIFACT_REPOSITORY`, `GCP_ARTIFACT_IMAGE_NAME`, `CLOUD_RUN_SERVICE`.
 
-- `BACKEND_URL` — HTTPS URL of this Cloud Run service.
-- `FRONTEND_URL` — your dashboard URL.
-- `CORS_ALLOWED_ORIGINS` — include that dashboard origin (regex already allows `*.a.run.app` for typical Cloud Run URLs).
-- API keys: `OPENAI_API_KEY`, `RECALL_*`, `AZURE_*`, `ANTHROPIC_API_KEY`, etc.
-- **`DATABASE_URL`** — use **Cloud SQL (Postgres)** or another managed Postgres for production; SQLite on the container disk is not durable across restarts.
-- **`REDIS_URL`** — optional but recommended for the transcript queue across instances (e.g. **Memorystore**).
+---
 
-Increase **request timeout** if long-lived WebSockets need it (Cloud Run supports up to 60 minutes).
+## Cloud Run environment (after first deploy)
 
-## 5. Dashboard
+Edit the service → **Variables & secrets** — align with `backend/.env.example`:
 
-Build the dashboard with your API URL:
+- `BACKEND_URL`, `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`
+- Provider keys: `OPENAI_*`, `RECALL_*`, `AZURE_*`, `ANTHROPIC_*`, `ELEVENLABS_*`, etc.
+- **`DATABASE_URL`** for production Postgres (e.g. Cloud SQL); avoid relying on SQLite on the container disk.
+- **`REDIS_URL`** optional but useful for queues across instances.
+
+Increase **request timeout** if long WebSocket sessions need it.
+
+---
+
+## Dashboard
+
+Build with your public API URL:
 
 ```bash
 cd dashboard
 VITE_API_BASE=https://YOUR-CLOUD-RUN-URL npm run build
 ```
 
-Host `dist/` on Cloud Storage + CDN, another Cloud Run static host, or any static host; set `VITE_ADMIN_API_KEY` at build time to match `ADMIN_API_KEY` on the backend.
-
-## 6. Connect GitHub to GCP (summary)
-
-- **GitHub** holds code; **Actions** builds the Docker image and deploys to **Cloud Run** using **`GCP_SA_KEY`** and the **Variables** above.
-- You do not “connect Cloud Run to GitHub” inside the GCP console for this flow: the workflow uses the gcloud API with the service account key.
-
-If the workflow fails, check: Artifact Registry path matches variables, APIs enabled, and the service account has the roles listed above.
+Host `dist/` wherever you like; set `VITE_ADMIN_API_KEY` at build time to match backend `ADMIN_API_KEY`.
