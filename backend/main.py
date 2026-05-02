@@ -113,7 +113,8 @@ app.add_middleware(
     allow_origins=cors_origins,
     allow_origin_regex=(
         r"https://.*\.(vercel\.app|trycloudflare\.com|railway\.app|ngrok-free\.app)"
-        r"|https://.*\.a\.run\.app"
+        # Regional Cloud Run: https://SERVICE-PROJECT.REGION.run.app (not only *.a.run.app)
+        r"|https://.+\.run\.app$"
     ),
     allow_credentials="*" not in cors_origins,
     allow_methods=["*"],
