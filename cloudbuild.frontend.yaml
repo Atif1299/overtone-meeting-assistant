@@ -4,9 +4,9 @@
 
 substitutions:
   _REGION: europe-west1
-  _SERVICE: overtone-frontend
-  _AR_REPOSITORY: overtone
-  _IMAGE_NAME: overtone-frontend
+  _SERVICE: overtone-meeting-assistant-frontend
+  _AR_REPOSITORY: cloud-run-source-deploy
+  _IMAGE_NAME: overtone-meeting-assistant/overtone-meeting-assistant-frontend
   _VITE_API_BASE: https://REPLACE-WITH-YOUR-BACKEND.run.app
   _VITE_WS_BASE: wss://REPLACE-WITH-YOUR-BACKEND.run.app
 
