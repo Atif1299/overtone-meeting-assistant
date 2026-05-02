@@ -1,23 +1,28 @@
-# Cloud Build: API (backend) image → Artifact Registry → Cloud Run.
-# Frontend and dashboard: see cloudbuild.frontend.yaml and cloudbuild.dashboard.yaml
-# Use with a trigger: GCP Console → Cloud Build → Triggers → Connect GitHub repository.
-# No GitHub Actions secrets required — Google pulls your repo after one-time OAuth.
-#
-# Override defaults in the trigger: Edit trigger → Substitution variables (_REGION, _SERVICE, …)
+# Cloud Build: presenter frontend (Vite + nginx on Cloud Run).
+# Create a second trigger: config file = cloudbuild.frontend.yaml
+# Set substitutions _VITE_API_BASE and _VITE_WS_BASE to your *backend* Cloud Run URL (https / wss).
 
 substitutions:
-  _REGION: us-central1
-  _SERVICE: overtone-backend
+  _REGION: europe-west1
+  _SERVICE: overtone-frontend
   _AR_REPOSITORY: overtone
-  _IMAGE_NAME: overtone-backend
+  _IMAGE_NAME: overtone-frontend
+  _VITE_API_BASE: https://REPLACE-WITH-YOUR-BACKEND.run.app
+  _VITE_WS_BASE: wss://REPLACE-WITH-YOUR-BACKEND.run.app
 
 steps:
   - name: gcr.io/cloud-builders/docker
     args:
       - build
+      - -f
+      - frontend/Dockerfile
+      - --build-arg
+      - VITE_API_BASE=${_VITE_API_BASE}
+      - --build-arg
+      - VITE_WS_BASE=${_VITE_WS_BASE}
       - -t
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
-      - ./backend
+      - frontend
 
   - name: gcr.io/cloud-builders/docker
     args:

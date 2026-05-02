@@ -1,23 +1,28 @@
-# Cloud Build: API (backend) image → Artifact Registry → Cloud Run.
-# Frontend and dashboard: see cloudbuild.frontend.yaml and cloudbuild.dashboard.yaml
-# Use with a trigger: GCP Console → Cloud Build → Triggers → Connect GitHub repository.
-# No GitHub Actions secrets required — Google pulls your repo after one-time OAuth.
-#
-# Override defaults in the trigger: Edit trigger → Substitution variables (_REGION, _SERVICE, …)
+# Cloud Build: admin dashboard (Vite + nginx on Cloud Run).
+# Create a third trigger: config file = cloudbuild.dashboard.yaml
+# Set _VITE_API_BASE to backend URL; _VITE_ADMIN_API_KEY must match backend ADMIN_API_KEY (sensitive — prefer Secret Manager + manual deploy if needed).
 
 substitutions:
-  _REGION: us-central1
-  _SERVICE: overtone-backend
+  _REGION: europe-west1
+  _SERVICE: overtone-dashboard
   _AR_REPOSITORY: overtone
-  _IMAGE_NAME: overtone-backend
+  _IMAGE_NAME: overtone-dashboard
+  _VITE_API_BASE: https://REPLACE-WITH-YOUR-BACKEND.run.app
+  _VITE_ADMIN_API_KEY: REPLACE-WITH-ADMIN-KEY
 
 steps:
   - name: gcr.io/cloud-builders/docker
     args:
       - build
+      - -f
+      - dashboard/Dockerfile
+      - --build-arg
+      - VITE_API_BASE=${_VITE_API_BASE}
+      - --build-arg
+      - VITE_ADMIN_API_KEY=${_VITE_ADMIN_API_KEY}
       - -t
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
-      - ./backend
+      - dashboard
 
   - name: gcr.io/cloud-builders/docker
     args:

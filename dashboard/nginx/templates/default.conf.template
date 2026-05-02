@@ -1,0 +1,10 @@
+# Cloud Run sets PORT. Nginx official image runs envsubst on this file.
+server {
+    listen       ${PORT};
+    server_name  localhost;
+    location / {
+        root   /usr/share/nginx/html;
+        index  index.html;
+        try_files $uri $uri/ /index.html;
+    }
+}
