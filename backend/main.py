@@ -111,7 +111,10 @@ cors_origins = _parse_cors_origins(settings.cors_allowed_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https://.*\.(vercel\.app|trycloudflare\.com|railway\.app|ngrok-free\.app)",
+    allow_origin_regex=(
+        r"https://.*\.(vercel\.app|trycloudflare\.com|railway\.app|ngrok-free\.app)"
+        r"|https://.*\.a\.run\.app"
+    ),
     allow_credentials="*" not in cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -183,7 +186,9 @@ async def presentation_ws(websocket: WebSocket, session_id: str, db: Session = D
 def run() -> None:
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", "8000"))
+    reload = os.getenv("VOICENAV_DEV") == "1"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=reload)
 
 
 if __name__ == "__main__":

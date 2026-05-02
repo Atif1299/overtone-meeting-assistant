@@ -1,0 +1,13 @@
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.env
+*.db
+.git
+.gitignore
+presentations/*/
+!presentations/.gitkeep
+generated_audio/
+data/*.db
+tests/
