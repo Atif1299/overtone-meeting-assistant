@@ -15,6 +15,11 @@ node_modules/
 dist/
 .DS_Store
 .playwright-mcp/
-dashboard/.env*
-frontend/.env*
+dashboard/.env
+dashboard/.env.local
+!dashboard/.env.example
+frontend/.env
+frontend/.env.local
+!frontend/.env.example
 *.db
+logs/
