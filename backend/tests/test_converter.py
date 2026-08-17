@@ -14,6 +14,15 @@ from indexer.converter import (
 )
 
 
+def test_soffice_path_accepts_windows_candidates(monkeypatch, tmp_path):
+    fake = tmp_path / "soffice.exe"
+    fake.write_bytes(b"")
+    monkeypatch.setenv("SOFFICE_PATH", str(fake))
+    from indexer.converter import _get_soffice_path
+
+    assert _get_soffice_path() == str(fake)
+
+
 def test_convert_pdf_returns_correct_structure(tmp_path):
     """convert_to_page_images returns dict with presentation_id, total_pages, page_images."""
     fake_pdf = tmp_path / "slide.pdf"
@@ -51,19 +60,32 @@ def test_convert_pptx_calls_libreoffice_first(tmp_path):
     mock_lo.assert_awaited_once()
 
 
-def test_pdf_to_pngs_renames_to_page_n(tmp_path):
-    """_pdf_to_pngs renames pdftoppm output (page-01.png) to page_1.png."""
+def test_pdf_to_pngs_writes_page_n(tmp_path):
+    """_pdf_to_pngs writes page_N.png files via PyMuPDF."""
     out_dir = tmp_path / "pages"
     out_dir.mkdir()
 
-    # Simulate pdftoppm output files
-    (out_dir / "page-01.png").write_bytes(b"png1")
-    (out_dir / "page-02.png").write_bytes(b"png2")
+    class FakePix:
+        def save(self, path):
+            Path(path).write_bytes(b"png")
 
-    def fake_run(cmd, **kwargs):
-        pass  # pdftoppm already "ran" above — files exist
+    class FakePage:
+        def get_pixmap(self, matrix, alpha):
+            return FakePix()
 
-    with patch("indexer.converter.subprocess.run", side_effect=fake_run):
+    class FakeDoc:
+        def __init__(self):
+            self._pages = [FakePage(), FakePage()]
+
+        def __iter__(self):
+            return iter(self._pages)
+
+        def close(self):
+            return None
+
+    fake_fitz = MagicMock()
+    fake_fitz.open.return_value = FakeDoc()
+    with patch.dict("sys.modules", {"fitz": fake_fitz}):
         result = asyncio.run(_pdf_to_pngs(tmp_path / "slide.pdf", out_dir))
 
     assert len(result) == 2

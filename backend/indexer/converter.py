@@ -10,22 +10,53 @@ from pathlib import Path
 
 from config import get_settings
 
-SOFFICE = (
-    os.getenv("SOFFICE_PATH")
-    or shutil.which("soffice")
-    or "/Applications/LibreOffice.app/Contents/MacOS/soffice"
-)
 RENDER_DPI = os.getenv("CONVERTER_DPI", "150")  # 150 DPI → ~2000×1125 for 16:9 slides (1.56× retina, sharp)
 
 
+def _first_existing(paths: list[str]) -> str:
+    for raw in paths:
+        if raw and Path(raw).is_file():
+            return raw
+    return ""
+
+
+def _windows_soffice_candidates() -> list[str]:
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    local_app_data = os.environ.get("LOCALAPPDATA", "")
+    candidates = [
+        str(Path(program_files) / "LibreOffice" / "program" / "soffice.exe"),
+        str(Path(program_files_x86) / "LibreOffice" / "program" / "soffice.exe"),
+    ]
+    if local_app_data:
+        candidates.append(
+            str(Path(local_app_data) / "Programs" / "LibreOffice" / "program" / "soffice.exe")
+        )
+    return candidates
+
+
+def _get_soffice_path() -> str:
+    return (
+        os.getenv("SOFFICE_PATH")
+        or shutil.which("soffice")
+        or shutil.which("soffice.exe")
+        or _first_existing(_windows_soffice_candidates())
+        or "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    )
+
+
+SOFFICE = _get_soffice_path()
+
+
 def _get_pdftoppm_path() -> str:
-    """Get pdftoppm path from settings, env, PATH, or Mac default."""
+    """Get pdftoppm path from settings, env, PATH, or OS defaults."""
     settings = get_settings()
     if settings.pdftoppm_path:
         return settings.pdftoppm_path
     return (
         os.getenv("PDFTOPPM_PATH")
         or shutil.which("pdftoppm")
+        or shutil.which("pdftoppm.exe")
         or "/opt/homebrew/bin/pdftoppm"
     )
 
@@ -35,6 +66,7 @@ def _get_pdfinfo_path() -> str:
     return (
         os.getenv("PDFINFO_PATH")
         or shutil.which("pdfinfo")
+        or shutil.which("pdfinfo.exe")
         or "/usr/bin/pdfinfo"
     )
 
@@ -124,9 +156,10 @@ async def convert_to_page_images(
 
 async def _pptx_to_pdf(pptx_path: Path, out_dir: Path) -> Path:
     """Convert PPTX to PDF using LibreOffice headless."""
+    soffice = _get_soffice_path()
     await asyncio.to_thread(
         subprocess.run,
-        [SOFFICE, "--headless", "--convert-to", "pdf", "--outdir", str(out_dir), str(pptx_path)],
+        [soffice, "--headless", "--convert-to", "pdf", "--outdir", str(out_dir), str(pptx_path)],
         check=True,
         capture_output=True,
     )

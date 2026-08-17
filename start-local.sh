@@ -11,9 +11,19 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="$ROOT/backend/.env"
 
 # ── sanity checks ────────────────────────────────────────────────────────────
-if [ ! -f "$ROOT/backend/venv/bin/python" ]; then
-  echo "ERROR: backend/venv not found. Run:"
-  echo "  cd backend && python3.11 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
+PYTHON=""
+if [ -x "$ROOT/backend/.venv/bin/python" ]; then
+  PYTHON="$ROOT/backend/.venv/bin/python"
+elif [ -x "$ROOT/backend/venv/bin/python" ]; then
+  PYTHON="$ROOT/backend/venv/bin/python"
+elif [ -x "$ROOT/backend/.venv/Scripts/python.exe" ]; then
+  PYTHON="$ROOT/backend/.venv/Scripts/python.exe"
+elif [ -x "$ROOT/backend/venv/Scripts/python.exe" ]; then
+  PYTHON="$ROOT/backend/venv/Scripts/python.exe"
+fi
+if [ -z "$PYTHON" ]; then
+  echo "ERROR: backend venv not found. Run:"
+  echo "  cd backend && python3.11 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
   exit 1
 fi
 if [ ! -d "$ROOT/frontend/node_modules" ]; then
@@ -51,7 +61,7 @@ wait_for_tunnel_url() {
 }
 
 # ── local data dirs (idempotent) ─────────────────────────────────────────────
-mkdir -p "$ROOT/backend/data" "$ROOT/presentations" "$ROOT/backend/generated_audio"
+mkdir -p "$ROOT/backend/data" "$ROOT/backend/presentations" "$ROOT/backend/generated_audio" "$ROOT/logs"
 
 ALL_PIDS=()
 
@@ -72,12 +82,12 @@ cloudflared tunnel --url http://localhost:5173 --no-autoupdate > /tmp/cf-fronten
 ALL_PIDS+=($!)
 
 # ── app services ─────────────────────────────────────────────────────────────
-echo "Starting frontend → http://127.0.0.1:5173  (log: /tmp/voicenav-frontend.log)"
-cd "$ROOT/frontend" && npm run dev > /tmp/voicenav-frontend.log 2>&1 &
+echo "Starting frontend → http://127.0.0.1:5173  (log: logs/frontend.log)"
+cd "$ROOT/frontend" && npm run dev > "$ROOT/logs/frontend.log" 2>&1 &
 ALL_PIDS+=($!)
 
-echo "Starting dashboard→ http://127.0.0.1:5174  (log: /tmp/voicenav-dashboard.log)"
-cd "$ROOT/dashboard" && npm run dev > /tmp/voicenav-dashboard.log 2>&1 &
+echo "Starting dashboard→ http://127.0.0.1:5174  (log: logs/dashboard.log)"
+cd "$ROOT/dashboard" && npm run dev > "$ROOT/logs/dashboard.log" 2>&1 &
 ALL_PIDS+=($!)
 
 # ── wait for tunnel URLs ──────────────────────────────────────────────────────
@@ -100,46 +110,12 @@ set_env "CORS_ALLOWED_ORIGINS" \
 # ── update Azure Blob CORS with live origins ─────────────────────────────────
 echo "Updating Azure Blob CORS rules…"
 cd "$ROOT/backend"
-venv/bin/python - <<PYEOF
-import os, sys
-from dotenv import load_dotenv
-load_dotenv(".env")
-try:
-    from azure.storage.blob import BlobServiceClient
-    from azure.storage.blob._models import CorsRule
-except ImportError:
-    print("  azure-storage-blob not installed, skipping CORS update")
-    sys.exit(0)
-
-account_url = os.getenv("AZURE_BLOB_ACCOUNT_URL","").rstrip("/")
-account_key  = os.getenv("AZURE_BLOB_ACCOUNT_KEY","")
-frontend_tunnel = os.getenv("FRONTEND_URL","")
-if not account_url or not account_key:
-    print("  No Azure Blob credentials — skipping CORS update")
-    sys.exit(0)
-
-origins = [
-    "http://127.0.0.1:5173","http://localhost:5173",
-    "http://127.0.0.1:5174","http://localhost:5174",
-]
-if frontend_tunnel:
-    origins.append(frontend_tunnel)
-
-rule = CorsRule(
-    allowed_origins=origins,
-    allowed_methods=["GET","PUT","DELETE","HEAD","OPTIONS","POST"],
-    allowed_headers=["*"],
-    exposed_headers=["*"],
-    max_age_in_seconds=3600,
-)
-BlobServiceClient(account_url=account_url, credential=account_key).set_service_properties(cors=[rule])
-print(f"  CORS updated for {len(origins)} origins (incl. tunnel)")
-PYEOF
+"$PYTHON" "$ROOT/scripts/update_blob_cors.py"
 
 # ── start backend (after env is patched) ─────────────────────────────────────
-echo "Starting backend  → http://127.0.0.1:8000  (log: /tmp/voicenav-backend.log)"
+echo "Starting backend  → http://127.0.0.1:8000  (log: logs/backend.log)"
 cd "$ROOT/backend"
-venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8000 > /tmp/voicenav-backend.log 2>&1 &
+"$PYTHON" -m uvicorn main:app --reload --host 0.0.0.0 --port 8000 > "$ROOT/logs/backend.log" 2>&1 &
 ALL_PIDS+=($!)
 
 # ── health check ─────────────────────────────────────────────────────────────
@@ -152,7 +128,7 @@ done
 if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
   echo "✓ Backend healthy"
 else
-  echo "⚠ Backend not yet responding — check /tmp/voicenav-backend.log"
+  echo "⚠ Backend not yet responding — check logs/backend.log"
 fi
 
 # ── summary ───────────────────────────────────────────────────────────────────
