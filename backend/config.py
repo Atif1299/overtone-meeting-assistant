@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
     openai_model: str = "gpt-4o"
-    openai_realtime_model: str = "gpt-4o-realtime-preview-2024-12-17"
+    openai_realtime_model: str = "gpt-realtime-2.1"
     openai_realtime_voice: str = "alloy"
     openai_realtime_vad_threshold: float = 0.7
     openai_realtime_vad_silence_ms: int = 700
