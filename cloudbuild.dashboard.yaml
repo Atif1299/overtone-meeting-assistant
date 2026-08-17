@@ -1,14 +1,15 @@
 # Cloud Build: admin dashboard (Vite + nginx on Cloud Run).
 # Create a third trigger: config file = cloudbuild.dashboard.yaml
-# Set _VITE_API_BASE to backend URL; _VITE_ADMIN_API_KEY must match backend ADMIN_API_KEY (sensitive — prefer Secret Manager + manual deploy if needed).
+# Set _VITE_API_BASE to the backend Cloud Run URL.
+# _VITE_ADMIN_API_KEY must match backend ADMIN_API_KEY (visible in build logs —
+# prefer Secret Manager + manual image deploy for production).
 
-# Defaults match Cloud Run “connect repo” / europe-west1 Artifact Registry layout.
-# Override _VITE_* in the trigger (required for a working dashboard bundle).
 substitutions:
-  _REGION: europe-west1
-  _SERVICE: overtone-meeting-assistant-dashboard
-  _AR_REPOSITORY: cloud-run-source-deploy
-  _IMAGE_NAME: overtone-meeting-assistant/overtone-meeting-assistant-dashboard
+  _REGION: us-central1
+  _RUN_REGION: europe-west1
+  _SERVICE: overtone-dashboard
+  _AR_REPOSITORY: overtone
+  _IMAGE_NAME: overtone-dashboard
   _VITE_API_BASE: https://REPLACE-WITH-YOUR-BACKEND.run.app
   _VITE_ADMIN_API_KEY: REPLACE-WITH-ADMIN-KEY
 
@@ -23,13 +24,13 @@ steps:
       - --build-arg
       - VITE_ADMIN_API_KEY=${_VITE_ADMIN_API_KEY}
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
       - dashboard
 
   - name: gcr.io/cloud-builders/docker
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
@@ -37,11 +38,12 @@ steps:
       - run
       - deploy
       - ${_SERVICE}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
-      - --region=${_REGION}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
+      - --region=${_RUN_REGION}
       - --platform=managed
       - --allow-unauthenticated
       - --port=8080
+      - --timeout=300
 
 options:
   logging: CLOUD_LOGGING_ONLY

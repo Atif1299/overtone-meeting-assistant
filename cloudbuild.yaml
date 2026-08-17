@@ -7,6 +7,7 @@
 
 substitutions:
   _REGION: us-central1
+  _RUN_REGION: europe-west1
   _SERVICE: overtone-backend
   _AR_REPOSITORY: overtone
   _IMAGE_NAME: overtone-backend
@@ -16,13 +17,13 @@ steps:
     args:
       - build
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
       - ./backend
 
   - name: gcr.io/cloud-builders/docker
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
@@ -30,11 +31,14 @@ steps:
       - run
       - deploy
       - ${_SERVICE}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
-      - --region=${_REGION}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
+      - --region=${_RUN_REGION}
       - --platform=managed
       - --allow-unauthenticated
       - --port=8080
+      - --timeout=3600
+      - --cpu=1
+      - --memory=1Gi
 
 options:
   logging: CLOUD_LOGGING_ONLY

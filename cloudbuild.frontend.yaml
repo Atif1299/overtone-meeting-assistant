@@ -1,12 +1,14 @@
 # Cloud Build: presenter frontend (Vite + nginx on Cloud Run).
 # Create a second trigger: config file = cloudbuild.frontend.yaml
-# Set substitutions _VITE_API_BASE and _VITE_WS_BASE to your *backend* Cloud Run URL (https / wss).
+# After the API is deployed, set substitutions _VITE_API_BASE and _VITE_WS_BASE
+# to that Cloud Run URL (https / wss). Do not leave the REPLACE placeholders.
 
 substitutions:
-  _REGION: europe-west1
-  _SERVICE: overtone-meeting-assistant-frontend
-  _AR_REPOSITORY: cloud-run-source-deploy
-  _IMAGE_NAME: overtone-meeting-assistant/overtone-meeting-assistant-frontend
+  _REGION: us-central1
+  _RUN_REGION: europe-west1
+  _SERVICE: overtone-frontend
+  _AR_REPOSITORY: overtone
+  _IMAGE_NAME: overtone-frontend
   _VITE_API_BASE: https://REPLACE-WITH-YOUR-BACKEND.run.app
   _VITE_WS_BASE: wss://REPLACE-WITH-YOUR-BACKEND.run.app
 
@@ -21,13 +23,13 @@ steps:
       - --build-arg
       - VITE_WS_BASE=${_VITE_WS_BASE}
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
       - frontend
 
   - name: gcr.io/cloud-builders/docker
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
@@ -35,11 +37,12 @@ steps:
       - run
       - deploy
       - ${_SERVICE}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$SHORT_SHA
-      - --region=${_REGION}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
+      - --region=${_RUN_REGION}
       - --platform=managed
       - --allow-unauthenticated
       - --port=8080
+      - --timeout=300
 
 options:
   logging: CLOUD_LOGGING_ONLY
