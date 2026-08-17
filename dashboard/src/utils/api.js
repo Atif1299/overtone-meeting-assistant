@@ -80,8 +80,9 @@ export async function listCustomers() {
 
 
 function withAdminHeader(headers = {}) {
-  if (!ADMIN_API_KEY) return headers;
-  return { ...headers, "X-API-Key": ADMIN_API_KEY };
+  const key = ADMIN_API_KEY || getAuthToken();
+  if (!key) return headers;
+  return { ...headers, "X-API-Key": key };
 }
 
 async function parseError(response) {

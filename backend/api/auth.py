@@ -5,6 +5,9 @@ from config import Settings, get_settings
 from database import get_db
 from models.api_key import ApiKey
 
+OPERATOR_CUSTOMER_ID = "operator"
+OPERATOR_CUSTOMER_NAME = "Operator"
+
 
 def _extract_bearer_token(authorization: str | None) -> str | None:
     if not authorization:
@@ -15,32 +18,49 @@ def _extract_bearer_token(authorization: str | None) -> str | None:
     return None
 
 
+def _operator_key(provided: str | None) -> ApiKey:
+    return ApiKey(
+        key=provided or "operator",
+        customer_id=OPERATOR_CUSTOMER_ID,
+        customer_name=OPERATOR_CUSTOMER_NAME,
+        is_active=True,
+    )
+
+
 async def require_customer_key(
+    settings: Settings = Depends(get_settings),
     x_api_key: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
     api_key: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> ApiKey:
     """
-    Customer API auth gate:
-    Checks the provided API key against the api_keys table in the database.
-    Allows passing key via X-API-Key header, Authorization header, or api_key query param.
+    Customer API auth gate.
+
+    Accepts a row from the api_keys table, or the configured ADMIN_API_KEY
+    (dashboard operator). If ADMIN_API_KEY is unset, unauthenticated local
+    access is allowed — same open-dev behavior as require_admin_key.
     """
     provided = x_api_key or api_key or _extract_bearer_token(authorization)
-    if not provided:
-        raise HTTPException(401, "API key missing")
+    admin_key = (settings.admin_api_key or "").strip()
 
-    api_key_record = (
-        db.query(ApiKey)
-        .filter(ApiKey.key == provided, ApiKey.is_active == True)
-        .first()
-    )
-    if not api_key_record:
-        print(f"[auth] Invalid or inactive key provided: {provided!r}")
+    if admin_key and provided == admin_key:
+        return _operator_key(provided)
+
+    if provided:
+        api_key_record = (
+            db.query(ApiKey)
+            .filter(ApiKey.key == provided, ApiKey.is_active == True)
+            .first()
+        )
+        if api_key_record:
+            return api_key_record
         raise HTTPException(401, "Invalid API key")
 
-    print(f"[auth] Customer {api_key_record.customer_name!r} validated")
-    return api_key_record
+    if not admin_key:
+        return _operator_key(None)
+
+    raise HTTPException(401, "API key missing")
 
 
 async def require_admin_key(
@@ -55,18 +75,10 @@ async def require_admin_key(
       - X-API-Key: <key>
       - Authorization: Bearer <key>
     """
-    # Debug prints for local testing
-    print(f"[auth] settings.admin_api_key(raw)={settings.admin_api_key!r}")
-    required_key = settings.admin_api_key.strip()
+    required_key = (settings.admin_api_key or "").strip()
     if not required_key:
-        print("[auth] Admin API key not configured - allowing open access")
         return
 
     provided = x_api_key or _extract_bearer_token(authorization)
-    print(
-        f"[auth] provided admin x_api_key={x_api_key!r} authorization={authorization!r} extracted={provided!r}"
-    )
     if provided != required_key:
-        print("[auth] Admin API key missing or invalid")
         raise HTTPException(401, "Admin API key missing or invalid")
-    print("[auth] Admin API key validated")
