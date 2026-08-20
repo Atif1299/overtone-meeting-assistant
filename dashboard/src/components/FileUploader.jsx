@@ -29,7 +29,7 @@ export default function FileUploader({ onUploaded, busy = false }) {
     >
       <p className="uploader-title">Drop .pptx or .pdf files</p>
       <p className="helper-text">
-        Each slide is rendered as an image and analyzed by Claude Vision for rich semantic search.
+        Each slide is rendered as an image and analyzed by OpenAI Vision for rich semantic search.
       </p>
       <input
         className="input"
@@ -46,7 +46,7 @@ export default function FileUploader({ onUploaded, busy = false }) {
         }}
       />
       {selectedName ? <p className="helper-text">Selected: {selectedName}</p> : null}
-      {busy ? <p className="helper-text shimmer-text">Uploading — Claude Vision is processing each slide...</p> : null}
+      {busy ? <p className="helper-text shimmer-text">Uploading — OpenAI Vision is processing each slide...</p> : null}
     </div>
   );
 }

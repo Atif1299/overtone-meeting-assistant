@@ -29,7 +29,13 @@ def test_session_update_payload_uses_vad_settings() -> None:
             settings.openai_realtime_interrupt_response,
         ) = previous
 
-    turn_detection = payload["session"]["turn_detection"]
+    session = payload["session"]
+    assert session["type"] == "realtime"
+    assert "modalities" not in session
+    assert "voice" not in session
+    assert "turn_detection" not in session
+    assert session["audio"]["output"]["voice"]
+    turn_detection = session["audio"]["input"]["turn_detection"]
     assert turn_detection["type"] == "server_vad"
     assert turn_detection["threshold"] == 0.9
     assert turn_detection["silence_duration_ms"] == 1200
@@ -59,7 +65,7 @@ def test_session_update_payload_clamps_bad_vad_values() -> None:
             settings.openai_realtime_vad_prefix_padding_ms,
         ) = previous
 
-    turn_detection = payload["session"]["turn_detection"]
+    turn_detection = payload["session"]["audio"]["input"]["turn_detection"]
     assert turn_detection["threshold"] == 1.0
     assert turn_detection["silence_duration_ms"] == 300
     assert turn_detection["prefix_padding_ms"] == 0

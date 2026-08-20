@@ -15,9 +15,10 @@ def test_health_exposes_runtime_metrics(client: TestClient) -> None:
     assert "webhook_dedupe_cache" in payload
 
 
-def test_upload_and_list_presentation(client: TestClient) -> None:
+def test_upload_and_list_presentation(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setattr("api.presentations.dispatch_index_job", lambda _presentation_id: True)
     response = client.post(
-        "/api/upload",
+        "/api/v1/presentations",
         files={"file": ("deck.pdf", b"%PDF-1.4 fake content", "application/pdf")},
     )
     assert response.status_code == 200
@@ -25,7 +26,7 @@ def test_upload_and_list_presentation(client: TestClient) -> None:
     assert uploaded["filename"] == "deck.pdf"
     assert uploaded["status"] == "uploaded"
 
-    list_response = client.get("/api/presentations")
+    list_response = client.get("/api/v1/presentations")
     assert list_response.status_code == 200
     assert any(item["presentation_id"] == uploaded["presentation_id"] for item in list_response.json())
 
@@ -37,9 +38,9 @@ def test_upload_dispatches_index_job(client: TestClient, monkeypatch) -> None:
         dispatched.append(presentation_id)
         return True
 
-    monkeypatch.setattr("api.upload.dispatch_index_job", fake_dispatch)
+    monkeypatch.setattr("api.presentations.dispatch_index_job", fake_dispatch)
     response = client.post(
-        "/api/upload",
+        "/api/v1/presentations",
         files={"file": ("deck.pdf", b"%PDF-1.4 fake content", "application/pdf")},
     )
     assert response.status_code == 200
@@ -48,10 +49,10 @@ def test_upload_dispatches_index_job(client: TestClient, monkeypatch) -> None:
 
 
 def test_chunked_upload_flow(client: TestClient, monkeypatch) -> None:
-    monkeypatch.setattr("api.upload.dispatch_index_job", lambda _presentation_id: True)
+    monkeypatch.setattr("api.presentations.dispatch_index_job", lambda _presentation_id: True)
 
     init = client.post(
-        "/api/upload/init",
+        "/api/v1/presentations/init",
         data={
             "filename": "deck.pdf",
             "total_size": "24",
@@ -62,7 +63,7 @@ def test_chunked_upload_flow(client: TestClient, monkeypatch) -> None:
     presentation_id = init.json()["presentation_id"]
 
     chunk_a = client.post(
-        f"/api/upload/{presentation_id}/chunk",
+        f"/api/v1/presentations/{presentation_id}/chunk",
         data={"chunk_index": "0"},
         files={"chunk": ("part-0.bin", b"%PDF-1.4 ", "application/octet-stream")},
     )
@@ -70,23 +71,23 @@ def test_chunked_upload_flow(client: TestClient, monkeypatch) -> None:
     assert chunk_a.json()["ok"] is True
 
     chunk_b = client.post(
-        f"/api/upload/{presentation_id}/chunk",
+        f"/api/v1/presentations/{presentation_id}/chunk",
         data={"chunk_index": "1"},
         files={"chunk": ("part-1.bin", b"fake content", "application/octet-stream")},
     )
     assert chunk_b.status_code == 200
     assert chunk_b.json()["ok"] is True
 
-    complete = client.post(f"/api/upload/{presentation_id}/complete")
+    complete = client.post(f"/api/v1/presentations/{presentation_id}/complete")
     assert complete.status_code == 200
     payload = complete.json()
     assert payload["presentation_id"] == presentation_id
 
 
 def test_run_indexing_endpoint_executes_job(client: TestClient, monkeypatch) -> None:
-    monkeypatch.setattr("api.upload.dispatch_index_job", lambda _presentation_id: True)
+    monkeypatch.setattr("api.presentations.dispatch_index_job", lambda _presentation_id: True)
     uploaded = client.post(
-        "/api/upload",
+        "/api/v1/presentations",
         files={"file": ("deck.pdf", b"%PDF-1.4 fake content", "application/pdf")},
     ).json()
 
@@ -112,7 +113,8 @@ def test_run_indexing_endpoint_executes_job(client: TestClient, monkeypatch) -> 
     assert executed == [uploaded["presentation_id"]]
 
 
-def test_admin_api_key_enforced_when_configured(client: TestClient) -> None:
+def test_admin_api_key_enforced_when_configured(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setattr("api.presentations.dispatch_index_job", lambda _presentation_id: True)
     from config import get_settings
 
     settings = get_settings()
@@ -120,13 +122,13 @@ def test_admin_api_key_enforced_when_configured(client: TestClient) -> None:
     settings.admin_api_key = "phase2-secret"
     try:
         blocked = client.post(
-            "/api/upload",
+            "/api/v1/presentations",
             files={"file": ("deck.pdf", b"%PDF-1.4 fake content", "application/pdf")},
         )
         assert blocked.status_code == 401
 
         allowed = client.post(
-            "/api/upload",
+            "/api/v1/presentations",
             headers={"X-API-Key": "phase2-secret"},
             files={"file": ("deck.pdf", b"%PDF-1.4 fake content", "application/pdf")},
         )
@@ -137,7 +139,7 @@ def test_admin_api_key_enforced_when_configured(client: TestClient) -> None:
 
 def test_upload_rejects_unknown_extension(client: TestClient) -> None:
     response = client.post(
-        "/api/upload",
+        "/api/v1/presentations",
         files={"file": ("notes.txt", b"plain text", "text/plain")},
     )
     assert response.status_code == 400

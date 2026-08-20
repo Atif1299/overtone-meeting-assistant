@@ -183,7 +183,6 @@ async function apiDirectBlobUpload(file) {
   const blobResponse = await fetch(uploadUrl, {
     method: "PUT",
     headers: {
-      "x-ms-blob-type": "BlockBlob",
       "Content-Type": file.type || "application/octet-stream",
     },
     body: file,

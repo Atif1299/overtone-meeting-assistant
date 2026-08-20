@@ -59,14 +59,32 @@ def _make_fake_blob_storage(enabled=False):
     return FakeBlob
 
 
+def _stub_page_images(monkeypatch, tmp_path, count: int = 2):
+    pages = []
+    for i in range(1, count + 1):
+        p = tmp_path / f"page_{i}.png"
+        p.write_bytes(b"fake-png")
+        pages.append(str(p))
+
+    async def fake_convert(_source, _presentation_id):
+        return {"page_images": pages}
+
+    class _Converter:
+        convert_to_page_images = staticmethod(fake_convert)
+
+    monkeypatch.setattr(pipeline, "converter_mod", _Converter)
+    return pages
+
+
 def test_vision_pipeline_runs_end_to_end(monkeypatch, tmp_path):
     """Full pipeline: convert → vision → index → manifest → status=ready."""
     uploaded = storage_mod.save_upload("demo.pdf", b"%PDF-1.4 fake")
+    _stub_page_images(monkeypatch, tmp_path)
 
     monkeypatch.setattr(
         pipeline,
         "_run_vision_pipeline",
-        AsyncMock(return_value=SAMPLE_VISION_META),
+        AsyncMock(return_value=(SAMPLE_VISION_META, "vision", "gpt-4o")),
     )
     monkeypatch.setattr(
         pipeline,
@@ -93,11 +111,13 @@ def test_vision_pipeline_marks_failed_on_conversion_error(monkeypatch):
     """If converter raises, status is set to failed with error message."""
     uploaded = storage_mod.save_upload("bad.pdf", b"not a pdf")
 
-    monkeypatch.setattr(
-        pipeline,
-        "_run_vision_pipeline",
-        AsyncMock(side_effect=RuntimeError("pdftoppm failed")),
-    )
+    async def boom(_source, _presentation_id):
+        raise RuntimeError("pdftoppm failed")
+
+    class _Converter:
+        convert_to_page_images = staticmethod(boom)
+
+    monkeypatch.setattr(pipeline, "converter_mod", _Converter)
     monkeypatch.setattr(pipeline, "AzureBlobStorageClient", _make_fake_blob_storage(enabled=False))
 
     asyncio.run(pipeline.run_index_job(uploaded.presentation_id))
@@ -107,14 +127,15 @@ def test_vision_pipeline_marks_failed_on_conversion_error(monkeypatch):
     assert "pdftoppm failed" in (summary.index_error or "")
 
 
-def test_vision_pipeline_saves_local_pages_for_rag_fallback(monkeypatch):
+def test_vision_pipeline_saves_local_pages_for_rag_fallback(monkeypatch, tmp_path):
     """Vision metadata is saved to local storage so keyword RAG fallback works."""
     uploaded = storage_mod.save_upload("demo.pdf", b"%PDF-1.4 fake")
+    _stub_page_images(monkeypatch, tmp_path)
 
     monkeypatch.setattr(
         pipeline,
         "_run_vision_pipeline",
-        AsyncMock(return_value=SAMPLE_VISION_META),
+        AsyncMock(return_value=(SAMPLE_VISION_META, "vision", "gpt-4o")),
     )
     monkeypatch.setattr(pipeline, "_upload_to_search", AsyncMock(return_value=2))
     monkeypatch.setattr(pipeline, "_save_manifest", MagicMock())

@@ -24,57 +24,46 @@ export function useRealtimeAgent({
   onStatusChangeRef.current = onStatusChange;
   onErrorRef.current = onError;
 
-  const teardown = useCallback(() => {
+  const teardown = useCallback(async () => {
     const client = clientRef.current;
     const recorder = recorderRef.current;
     const player = playerRef.current;
-
-    // Clear refs immediately so setup() guards see null, but keep activeRef = true
-    // until async cleanup fully completes — prevents a second mount's setup() from
-    // racing in and creating a second player while the old one is still playing.
     clientRef.current = null;
     recorderRef.current = null;
     playerRef.current = null;
-
-    const cleanup = async () => {
-      isSpeakingRef.current = false;
-      try {
-        if (recorder?.recording) await recorder.pause();
-      } catch {
-        /* ignore */
-      }
-      try {
-        await recorder?.end?.();
-      } catch {
-        /* ignore */
-      }
-      try {
-        await player?.interrupt?.();
-      } catch {
-        /* ignore */
-      }
-      try {
-        await player?.disconnect?.();
-      } catch {
-        /* ignore */
-      }
-      try {
-        client?.disconnect?.();
-        client?.reset?.();
-      } catch {
-        /* ignore */
-      }
-      // Release the slot only after the old player is fully silenced.
-      activeRef.current = false;
-      setRealtimeStatus("disconnected");
-    };
-    void cleanup();
+    isSpeakingRef.current = false;
+    try {
+      if (recorder?.recording) await recorder.pause();
+    } catch {
+      /* ignore */
+    }
+    try {
+      await recorder?.end?.();
+    } catch {
+      /* ignore */
+    }
+    try {
+      await player?.interrupt?.();
+    } catch {
+      /* ignore */
+    }
+    try {
+      await player?.disconnect?.();
+    } catch {
+      /* ignore */
+    }
+    try {
+      client?.disconnect?.();
+      client?.reset?.();
+    } catch {
+      /* ignore */
+    }
+    activeRef.current = false;
+    setRealtimeStatus("disconnected");
   }, []);
 
   const setup = useCallback(async () => {
-    if (!enabled || !sessionId || !relayUrl || activeRef.current) return;
-    // Claim the slot synchronously before any await so a concurrent call
-    // (e.g. StrictMode's second mount) sees it and bails out immediately.
+    if (!enabled || !sessionId || !relayUrl || activeRef.current) return false;
     activeRef.current = true;
 
     const client = new RealtimeClient({ url: relayUrl });
@@ -99,12 +88,11 @@ export function useRealtimeAgent({
 
       client.on("disconnected", () => {
         isSpeakingRef.current = false;
+        activeRef.current = false;
         setRealtimeStatus("disconnected");
+        onStatusChangeRef.current?.("connecting");
       });
 
-      // Matches reference voice-agent-demo: interrupt player, cancel response.
-      // Do NOT gate the mic — pausing it breaks the interrupt loop because
-      // speech_started never fires and cancelled items never reach "completed".
       client.on("conversation.interrupted", async () => {
         const trackSampleOffset = await player.interrupt();
         if (trackSampleOffset?.trackId) {
@@ -137,11 +125,22 @@ export function useRealtimeAgent({
         }
       });
 
+      client.on("realtime.event", ({ event } = {}) => {
+        const type = event?.type;
+        if (type === "input_audio_buffer.speech_started") {
+          onStatusChangeRef.current?.("listening");
+        }
+        if (type === "response.created" || type === "response.audio.delta") {
+          onStatusChangeRef.current?.("speaking");
+        }
+      });
+
       await client.connect();
       await recorder.record((data) => client.appendInputAudio(data.mono));
 
       setRealtimeStatus("connected");
       onStatusChangeRef.current?.("listening");
+      return true;
     } catch (error) {
       console.error("Failed to initialize realtime agent", error);
       const isMicIssue =
@@ -155,14 +154,34 @@ export function useRealtimeAgent({
           : "Failed to initialize realtime voice agent"
       );
       activeRef.current = false;
+      return false;
     }
   }, [enabled, relayUrl, sessionId]);
 
   useEffect(() => {
     if (!enabled || !sessionId) return undefined;
-    void setup();
+    let stopped = false;
+
+    const loop = async () => {
+      while (!stopped) {
+        const ok = await setup();
+        if (stopped) break;
+        if (!ok) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1500));
+          continue;
+        }
+        while (!stopped && activeRef.current) {
+          await new Promise((resolve) => window.setTimeout(resolve, 500));
+        }
+        if (stopped) break;
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      }
+    };
+    void loop();
+
     return () => {
-      teardown();
+      stopped = true;
+      void teardown();
     };
   }, [enabled, sessionId, setup, teardown]);
 

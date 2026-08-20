@@ -72,12 +72,18 @@ def test_launch_bot_realtime_mode_includes_relay_and_disables_transcript_webhook
 def test_launch_bot_uses_agent_default_presentation_when_missing_in_payload(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, recall_settings
 ) -> None:
+    monkeypatch.setattr("api.presentations.dispatch_index_job", lambda _presentation_id: True)
     upload = client.post(
-        "/api/upload",
+        "/api/v1/presentations",
         files={"file": ("deck.pdf", b"%PDF-1.4 fake content", "application/pdf")},
     )
     assert upload.status_code == 200
     presentation_id = upload.json()["presentation_id"]
+    from services import storage as storage_mod
+
+    storage_mod.update_presentation_meta(
+        presentation_id, status="ready", indexed_pages=1, total_pages=1
+    )
 
     agent_version = client.post(
         "/api/agents/default/versions",

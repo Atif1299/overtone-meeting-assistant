@@ -22,7 +22,7 @@ function deriveHttpBaseFromWss() {
 
 function wsBase() {
   const u = import.meta.env.VITE_WS_BASE || "";
-  if (u) return u.replace(/\/$/, "");
+  if (u && !u.includes("REPLACE-WITH")) return u.replace(/\/$/, "");
   // If a ?wss= param is provided, use it directly.
   const relay = queryValue("wss");
   if (relay) {
@@ -67,11 +67,19 @@ export function realtimeRelayWsUrl(sessionId) {
   return `${wsBase()}/ws/realtime/${sessionId}`;
 }
 
+function isUsableHttpBase(value) {
+  if (!value) return false;
+  const normalized = String(value).trim();
+  if (!normalized) return false;
+  if (normalized.includes("REPLACE-WITH")) return false;
+  return true;
+}
+
 export function apiBase() {
-  const explicit = import.meta.env.VITE_API_BASE || queryValue("api");
-  if (explicit) return explicit.replace(/\/$/, "");
   const derivedFromRelay = deriveHttpBaseFromWss();
   if (derivedFromRelay) return derivedFromRelay;
+  const explicit = import.meta.env.VITE_API_BASE || queryValue("api");
+  if (isUsableHttpBase(explicit)) return explicit.replace(/\/$/, "");
   return "http://127.0.0.1:8000";
 }
 

@@ -19,18 +19,31 @@ export default function UploadPage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    let timer = null;
+
+    const loadCatalog = async () => {
       try {
         const list = await apiGet("/api/v1/presentations");
-        if (!cancelled) setPresentations(Array.isArray(list) ? list : []);
+        if (cancelled) return;
+        const items = Array.isArray(list) ? list : [];
+        setPresentations(items);
+        const busy = items.some((item) => ["uploaded", "indexing"].includes(String(item.status)));
+        if (busy) {
+          timer = window.setTimeout(loadCatalog, 2000);
+        }
       } catch {
-        if (!cancelled) setPresentations([]);
+        if (!cancelled) {
+          timer = window.setTimeout(loadCatalog, 2500);
+        }
       }
-    })();
+    };
+
+    loadCatalog();
     return () => {
       cancelled = true;
+      if (timer) window.clearTimeout(timer);
     };
-  }, []);
+  }, [uploading, pres?.presentation_id]);
 
   useEffect(() => {
     if (!activePresentationId) return;

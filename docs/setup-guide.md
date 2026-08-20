@@ -63,41 +63,34 @@ cd dashboard && npm install && cd ..
 cp backend/.env.example backend/.env
 ```
 
-Open `backend/.env` and fill in ALL of these keys:
+Open `backend/.env` and fill in these keys (see also `backend/.env.example`):
 
 ### Required keys
 
 | Key | Where to get it |
 |-----|-----------------|
 | `RECALL_API_KEY` | [Recall.ai dashboard](https://recall.ai) → API Keys |
-| `OPENAI_API_KEY` | [OpenAI platform](https://platform.openai.com/api-keys) |
-| `ANTHROPIC_API_KEY` | [Anthropic console](https://console.anthropic.com/settings/keys) |
-| `AZURE_SEARCH_ENDPOINT` | Azure portal → your AI Search service → Overview → URL (e.g. `https://my-search.search.windows.net`) |
-| `AZURE_SEARCH_KEY` | Azure portal → your AI Search service → Keys → Primary admin key |
-| `AZURE_BLOB_ACCOUNT_URL` | Azure portal → your Storage account → Overview (e.g. `https://myaccount.blob.core.windows.net`) |
-| `AZURE_BLOB_ACCOUNT_KEY` | Azure portal → your Storage account → Access keys → Key 1 |
-| `ADMIN_API_KEY` | Generate any random string (e.g. `openssl rand -base64 32`). Used to authenticate dashboard → backend API calls. |
+| `OPENAI_API_KEY` | [OpenAI platform](https://platform.openai.com/api-keys) — embeddings (and OpenAI Realtime/Vision fallback) |
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) — preferred Live voice + Vision when set |
+| `ADMIN_API_KEY` | Generate any random string (e.g. `openssl rand -base64 32`). Dashboard → backend auth. |
 
-### Optional but recommended
+### Provider switches
 
 | Key | Default | Notes |
 |-----|---------|-------|
-| `OPENAI_REALTIME_MODEL` | `gpt-4o-realtime-preview-2024-12-17` | Can use `gpt-realtime-1.5` for newer model |
-| `OPENAI_REALTIME_VOICE` | `alloy` | Options: `alloy`, `coral`, `echo`, `shimmer` |
-| `RECALL_SKIP_WEBHOOK_VERIFY` | `false` | Set `true` for local dev (skips webhook signature check) |
-| `INDEXER_VISION_CONCURRENCY` | `3` | Parallel Claude Vision calls during indexing |
+| `REALTIME_PROVIDER` | `auto` | `auto` prefers Gemini Live when `GEMINI_API_KEY` is set, else OpenAI Realtime |
+| `INDEXER_PROVIDER` | `auto` | `auto` prefers Gemini Vision when `GEMINI_API_KEY` is set, else OpenAI Vision |
+| `GEMINI_LIVE_MODEL` | `gemini-2.5-flash-native-audio-preview-12-2025` | Gemini Live native-audio model |
+| `GEMINI_VISION_MODEL` | `gemini-2.0-flash` | Slide indexing vision model |
+| `OPENAI_REALTIME_MODEL` | `gpt-realtime` | Used when realtime provider is OpenAI |
+| `OPENAI_REALTIME_VOICE` | `alloy` | OpenAI voice |
+| `RECALL_SKIP_WEBHOOK_VERIFY` | `false` | Set `true` for local dev |
+| `GCS_BUCKET` | empty | Set on Cloud Run for durable decks; local can stay empty |
+| `DATABASE_URL` | empty | Postgres+pgvector in prod; empty locally = SQLite + keyword RAG |
 
-### Azure setup notes
+### Not required anymore
 
-**Azure AI Search:**
-1. Create a resource in Azure portal (Free tier works for dev)
-2. The index `overtone` is auto-created on first indexing run
-3. You need the **admin key** (not query key) because the app creates/manages the index
-
-**Azure Blob Storage:**
-1. Create a Storage Account in Azure portal
-2. Create a container named `presentations` (or set `AZURE_BLOB_CONTAINER_NAME` to your name)
-3. CORS is auto-configured by `start-local.sh` on each run
+Azure AI Search / Azure Blob / Anthropic keys are unused leftovers. Leave them blank.
 
 ---
 

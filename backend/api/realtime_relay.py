@@ -12,12 +12,25 @@ from websockets.exceptions import ConnectionClosed
 from websockets.legacy.client import connect as ws_connect
 
 from agents.runtime import compose_realtime_instructions
-from config import get_settings
+from config import effective_realtime_provider, get_settings
 from models.bot_session import AgentMode, BotSession
 from orchestrator.realtime_tools import REALTIME_TOOLS, RealtimeToolExecutor
 from orchestrator.ws_manager import ws_manager
 from orchestrator import relay_registry
 from services.filler_audio import get_random_filler_b64
+from services.gemini_live import (
+    decode_browser_pcm_b64,
+    encode_pcm_b64,
+    new_item_id,
+    new_response_id,
+    openai_tools_to_gemini,
+    parse_tool_args,
+    presenter_audio_delta_event,
+    presenter_transcript_delta_event,
+    presenter_turn_end_events,
+    presenter_turn_start_events,
+    resample_pcm16_mono,
+)
 from services.session_store import store
 from database import get_db
 from sqlalchemy.orm import Session
@@ -30,6 +43,39 @@ def _openai_realtime_url() -> str:
     settings = get_settings()
     model = quote(settings.openai_realtime_model, safe="")
     return f"wss://api.openai.com/v1/realtime?model={model}"
+
+
+def _openai_ws_headers() -> dict[str, str]:
+    return {"Authorization": f"Bearer {get_settings().openai_api_key}"}
+
+
+# Presenter still uses @openai/realtime-api-beta event names.
+_GA_TO_BETA_EVENT_TYPES = {
+    "response.output_audio.delta": "response.audio.delta",
+    "response.output_audio.done": "response.audio.done",
+    "response.output_audio_transcript.delta": "response.audio_transcript.delta",
+    "response.output_audio_transcript.done": "response.audio_transcript.done",
+    "response.output_text.delta": "response.text.delta",
+    "response.output_text.done": "response.text.done",
+    "conversation.item.added": "conversation.item.created",
+}
+
+
+def _normalize_openai_event(payload: dict) -> dict:
+    event_type = str(payload.get("type") or "")
+    mapped = _GA_TO_BETA_EVENT_TYPES.get(event_type)
+    if not mapped:
+        return payload
+    normalized = dict(payload)
+    normalized["type"] = mapped
+    return normalized
+
+
+def _openai_message_for_browser(message: str) -> str:
+    payload = _safe_json(message)
+    if not payload:
+        return message
+    return json.dumps(_normalize_openai_event(payload))
 
 
 def _session_update_payload(*, presentation_id: str, system_prompt: str, current_page: int = 1, auto_present_pages: int = 0, last_retrieval_context: str = "") -> dict:
@@ -47,21 +93,29 @@ def _session_update_payload(*, presentation_id: str, system_prompt: str, current
     return {
         "type": "session.update",
         "session": {
-            "modalities": ["text", "audio"],
-            "input_audio_format": "pcm16",
-            "output_audio_format": "pcm16",
-            "voice": settings.openai_realtime_voice,
-            "turn_detection": {
-                "type": "server_vad",
-                "threshold": vad_threshold,
-                "silence_duration_ms": silence_ms,
-                "prefix_padding_ms": prefix_padding_ms,
-                "create_response": True,
-                "interrupt_response": settings.openai_realtime_interrupt_response,
-            },
+            "type": "realtime",
+            "model": settings.openai_realtime_model,
             "instructions": instructions,
+            "output_modalities": ["audio"],
             "tools": REALTIME_TOOLS,
             "tool_choice": "auto",
+            "audio": {
+                "input": {
+                    "format": {"type": "audio/pcm", "rate": 24000},
+                    "turn_detection": {
+                        "type": "server_vad",
+                        "threshold": vad_threshold,
+                        "silence_duration_ms": silence_ms,
+                        "prefix_padding_ms": prefix_padding_ms,
+                        "create_response": True,
+                        "interrupt_response": settings.openai_realtime_interrupt_response,
+                    },
+                },
+                "output": {
+                    "format": {"type": "audio/pcm", "rate": 24000},
+                    "voice": settings.openai_realtime_voice,
+                },
+            },
         },
     }
 
@@ -87,7 +141,13 @@ async def realtime_relay(websocket: WebSocket, session_id: str, db: Session = De
         return
 
     settings = get_settings()
-    if not settings.openai_api_key:
+    provider = effective_realtime_provider(settings)
+    if provider == "gemini":
+        if not settings.gemini_api_key:
+            await websocket.accept(subprotocol="realtime")
+            await websocket.close(code=1011, reason="GEMINI_API_KEY is not configured")
+            return
+    elif not settings.openai_api_key:
         await websocket.accept(subprotocol="realtime")
         await websocket.close(code=1011, reason="OPENAI_API_KEY is not configured")
         return
@@ -107,13 +167,18 @@ class _RealtimeRelayRuntime:
         self._settings = get_settings()
         self._tool_executor = RealtimeToolExecutor(self._settings)
         self._openai_ws = None
+        self._gemini_session = None
+        self._provider = effective_realtime_provider(self._settings)
         self._connected_monotonic: float | None = None
         self._first_audio_recorded = False
-        self._tool_calls = int(session.extra.get("tool_calls", 0) or 0)
-        self._tool_failures = int(session.extra.get("tool_failures", 0) or 0)
-        self._relay_profile = str(session.extra.get("relay_profile") or "voicenav")
+        if not isinstance(session.extra, dict):
+            session.extra = {}
+        extra = session.extra
+        self._tool_calls = int(extra.get("tool_calls", 0) or 0)
+        self._tool_failures = int(extra.get("tool_failures", 0) or 0)
+        self._relay_profile = str(extra.get("relay_profile") or "voicenav")
         # Auto-present: server drives navigation, not the model
-        self._auto_present_limit = int(session.extra.get("auto_present_pages") or 0)
+        self._auto_present_limit = int(extra.get("auto_present_pages") or 0)
         self._auto_present_page = 0  # 0 = haven't started yet
         self._model_has_narrated = False  # True after model's first speech completes
         self._current_page = 1
@@ -123,163 +188,19 @@ class _RealtimeRelayRuntime:
         self._in_chat_response: bool = False
 
     async def run(self) -> None:
-        uri = _openai_realtime_url()
-        headers = {
-            "Authorization": f"Bearer {self._settings.openai_api_key}",
-            "Content-Type": "application/json",
-            "OpenAI-Beta": "realtime=v1",
-        }
         await self._set_state(relay_status="connecting", fallback_active=False)
-
         try:
-            if self._relay_profile == "demo":
-                await self._run_demo_passthrough(uri, headers)
+            if self._provider == "gemini":
+                await self._run_gemini_live()
                 return
-            async with ws_connect(
-                uri,
-                extra_headers=headers,
-                subprotocols=["realtime"],
-                ping_interval=20,
-                ping_timeout=20,
-                max_size=None,
-            ) as openai_ws:
-                self._openai_ws = openai_ws
-                self._connected_monotonic = time.monotonic()
-                relay_registry.register(self._session.session_id, openai_ws, self)
-                logger.info("Realtime relay connected session_id=%s", self._session.session_id)
-                await self._set_state(
-                    relay_status="connected",
-                    relay_connected_at=_now_utc_iso(),
-                    relay_last_error=None,
-                )
-
-                initial = await openai_ws.recv()
-                await self._set_state(relay_last_event_at=_now_utc_iso())
-                await self._browser_ws.send_text(initial)
-                agent_prompt = str(
-                    self._session.extra.get("agent_system_prompt")
-                    or "You are Overtone, a live voice assistant."
-                )
-                auto_present_pages = int(
-                    self._session.extra.get("auto_present_pages") or 0
-                )
-                last_context = str(self._session.extra.get("last_retrieval_context", ""))
-                await openai_ws.send(
-                    json.dumps(
-                        _session_update_payload(
-                            presentation_id=self._session.presentation_id,
-                            system_prompt=agent_prompt,
-                            current_page=self._current_page,
-                            auto_present_pages=auto_present_pages,
-                            last_retrieval_context=last_context,
-                        )
-                    )
-                )
-
-                # Wait for session.updated before injecting anything.
-                # OpenAI must finish applying our session config (VAD, tools, voice)
-                # before we can safely inject conversation items — otherwise the
-                # item arrives before VAD/tools are wired up and OpenAI drops it.
-                async with asyncio.timeout(5):
-                    while True:
-                        msg = await openai_ws.recv()
-                        await self._set_state(relay_last_event_at=_now_utc_iso())
-                        await self._browser_ws.send_text(msg)
-                        evt = json.loads(msg)
-                        if evt.get("type") == "session.updated":
-                            logger.info("session.updated received — ready to inject greeting")
-                            break
-
-                # If auto-present is on, inject slide 1 content immediately
-                # so the model narrates it right away instead of monologuing an intro.
-                if self._auto_present_limit > 0:
-                    self._auto_present_page = 1
-                    await ws_manager.broadcast_json(
-                        self._session.session_id,
-                        {"type": "navigate", "target_page": 1},
-                    )
-                    slide_content = ""
-                    slide_title = ""
-                    try:
-                        from services import storage as storage_mod
-                        pages = storage_mod.load_index_pages(self._session.presentation_id)
-                        for page in (pages or []):
-                            if int(page.get("page_number", 0)) == 1:
-                                slide_content = str(
-                                    page.get("searchable_content") or page.get("content_text") or ""
-                                ).strip()[:1500]
-                                slide_title = str(page.get("title") or "")
-                                break
-                    except Exception:
-                        pass
-                    
-                    if slide_content:
-                        await openai_ws.send(
-                            json.dumps({
-                                "type": "conversation.item.create",
-                                "item": {
-                                    "type": "message",
-                                    "role": "user",
-                                    "content": [{
-                                        "type": "input_text",
-                                        "text": (
-                                            f"SESSION START. Slide 1 context (for your reference only — do NOT narrate yet):\n"
-                                            f"Title: {slide_title}\n{slide_content}\n\n"
-                                            "Greet the participants warmly, use the slide context to tease what this presentation is about "
-                                            "in one compelling sentence, then ask if they're ready to begin."
-                                        ),
-                                    }],
-                                },
-                            })
-                        )
-                    else:
-                        await openai_ws.send(
-                            json.dumps({
-                                "type": "conversation.item.create",
-                                "item": {
-                                    "type": "message",
-                                    "role": "user",
-                                    "content": [{"type": "input_text", "text": "SESSION START. Greet the participants warmly and ask if they're ready to begin the presentation."}],
-                                },
-                            })
-                        )
-
-                    # Force the model to respond instantly with its greeting
-                    await openai_ws.send(json.dumps({"type": "response.create"}))
-                    logger.info("Auto-present: injected greeting trigger at session start")
-
-                else:
-                    # Q&A mode — bot should speak first when it joins the room.
-                    # Inject a session-start trigger so the model greets participants
-                    # immediately rather than sitting silent until someone speaks.
-                    await openai_ws.send(
-                        json.dumps({
-                            "type": "conversation.item.create",
-                            "item": {
-                                "type": "message",
-                                "role": "user",
-                                "content": [{"type": "input_text", "text": "SESSION_START"}],
-                            },
-                        })
-                    )
-                    await openai_ws.send(json.dumps({"type": "response.create"}))
-                    logger.info("Q&A mode: injected greeting trigger at session start")
-
-                browser_task = asyncio.create_task(self._pump_browser_to_openai())
-                openai_task = asyncio.create_task(self._pump_openai_to_browser())
-                done, pending = await asyncio.wait(
-                    [browser_task, openai_task],
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                for task in done:
-                    err = task.exception()
-                    if err:
-                        raise err
-                for task in pending:
-                    task.cancel()
-                await asyncio.gather(*pending, return_exceptions=True)
-        except ConnectionClosed:
-            logger.info("Realtime relay closed session_id=%s", self._session.session_id)
+            await self._run_openai_realtime()
+        except ConnectionClosed as exc:
+            logger.info(
+                "Realtime relay closed session_id=%s code=%s reason=%s",
+                self._session.session_id,
+                getattr(exc, "code", None),
+                getattr(exc, "reason", None) or str(exc),
+            )
         except WebSocketDisconnect:
             logger.info("Browser disconnected session_id=%s", self._session.session_id)
         except Exception as exc:
@@ -289,12 +210,516 @@ class _RealtimeRelayRuntime:
             relay_registry.unregister(self._session.session_id)
             await self._set_state(relay_status="disconnected")
 
+    async def _run_openai_realtime(self) -> None:
+        uri = _openai_realtime_url()
+        headers = _openai_ws_headers()
+        if self._relay_profile == "demo":
+            await self._run_demo_passthrough(uri, headers)
+            return
+        async with ws_connect(
+            uri,
+            extra_headers=headers,
+            ping_interval=20,
+            ping_timeout=20,
+            max_size=None,
+        ) as openai_ws:
+            self._openai_ws = openai_ws
+            self._connected_monotonic = time.monotonic()
+            relay_registry.register(self._session.session_id, openai_ws, self)
+            logger.info(
+                "Realtime relay connected provider=openai session_id=%s",
+                self._session.session_id,
+            )
+            await self._set_state(
+                relay_status="connected",
+                relay_connected_at=_now_utc_iso(),
+                relay_last_error=None,
+                realtime_provider="openai",
+            )
+
+            initial = await openai_ws.recv()
+            await self._set_state(relay_last_event_at=_now_utc_iso())
+            await self._browser_ws.send_text(_openai_message_for_browser(initial))
+            agent_prompt = str(
+                self._session.extra.get("agent_system_prompt")
+                or "You are Overtone, a live voice assistant."
+            )
+            auto_present_pages = int(
+                self._session.extra.get("auto_present_pages") or 0
+            )
+            last_context = str(self._session.extra.get("last_retrieval_context", ""))
+            await openai_ws.send(
+                json.dumps(
+                    _session_update_payload(
+                        presentation_id=self._session.presentation_id,
+                        system_prompt=agent_prompt,
+                        current_page=self._current_page,
+                        auto_present_pages=auto_present_pages,
+                        last_retrieval_context=last_context,
+                    )
+                )
+            )
+
+            handshake_ok = False
+            try:
+                async with asyncio.timeout(15):
+                    while True:
+                        msg = await openai_ws.recv()
+                        await self._set_state(relay_last_event_at=_now_utc_iso())
+                        await self._browser_ws.send_text(_openai_message_for_browser(msg))
+                        evt = _safe_json(msg) or {}
+                        event_type = str(evt.get("type") or "")
+                        logger.info(
+                            "OpenAI handshake event=%s session_id=%s model=%s",
+                            event_type,
+                            self._session.session_id,
+                            self._settings.openai_realtime_model,
+                        )
+                        if event_type == "error":
+                            err = evt.get("error") if isinstance(evt.get("error"), dict) else {}
+                            message = str(err.get("message") or evt)
+                            logger.error(
+                                "OpenAI handshake error session_id=%s payload=%s",
+                                self._session.session_id,
+                                evt,
+                            )
+                            await self._increment_error(message)
+                            raise RuntimeError(f"OpenAI handshake error: {message}")
+                        if event_type == "session.updated":
+                            handshake_ok = True
+                            logger.info("session.updated received — ready to inject greeting")
+                            break
+            except TimeoutError:
+                logger.warning(
+                    "session.updated timed out session_id=%s handshake_ok=%s; continuing",
+                    self._session.session_id,
+                    handshake_ok,
+                )
+
+            await self._inject_session_start_greeting_openai(openai_ws)
+
+            browser_task = asyncio.create_task(self._pump_browser_to_openai())
+            openai_task = asyncio.create_task(self._pump_openai_to_browser())
+            done, pending = await asyncio.wait(
+                [browser_task, openai_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in done:
+                err = task.exception()
+                if err:
+                    raise err
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+
+    async def _inject_session_start_greeting_openai(self, openai_ws) -> None:
+        if self._auto_present_limit > 0:
+            self._auto_present_page = 1
+            await ws_manager.broadcast_json(
+                self._session.session_id,
+                {"type": "navigate", "target_page": 1},
+            )
+            slide_content = ""
+            slide_title = ""
+            try:
+                from services import storage as storage_mod
+                pages = storage_mod.load_index_pages(self._session.presentation_id)
+                for page in (pages or []):
+                    if int(page.get("page_number", 0)) == 1:
+                        slide_content = str(
+                            page.get("searchable_content") or page.get("content_text") or ""
+                        ).strip()[:1500]
+                        slide_title = str(page.get("title") or "")
+                        break
+            except Exception:
+                pass
+
+            if slide_content:
+                await openai_ws.send(
+                    json.dumps({
+                        "type": "conversation.item.create",
+                        "item": {
+                            "type": "message",
+                            "role": "user",
+                            "content": [{
+                                "type": "input_text",
+                                "text": (
+                                    f"SESSION START. Slide 1 context (for your reference only — do NOT narrate yet):\n"
+                                    f"Title: {slide_title}\n{slide_content}\n\n"
+                                    "Greet the participants warmly, use the slide context to tease what this presentation is about "
+                                    "in one compelling sentence, then ask if they're ready to begin."
+                                ),
+                            }],
+                        },
+                    })
+                )
+            else:
+                await openai_ws.send(
+                    json.dumps({
+                        "type": "conversation.item.create",
+                        "item": {
+                            "type": "message",
+                            "role": "user",
+                            "content": [{"type": "input_text", "text": "SESSION START. Greet the participants warmly and ask if they're ready to begin the presentation."}],
+                        },
+                    })
+                )
+            await openai_ws.send(json.dumps({"type": "response.create"}))
+            logger.info("Auto-present: injected greeting trigger at session start")
+            return
+
+        await openai_ws.send(
+            json.dumps({
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "SESSION_START"}],
+                },
+            })
+        )
+        await openai_ws.send(json.dumps({"type": "response.create"}))
+        logger.info("Q&A mode: injected greeting trigger at session start")
+
+    async def _run_gemini_live(self) -> None:
+        from google import genai
+        from google.genai import types
+
+        agent_prompt = str(
+            self._session.extra.get("agent_system_prompt")
+            or "You are Overtone, a live voice assistant."
+        )
+        auto_present_pages = int(self._session.extra.get("auto_present_pages") or 0)
+        last_context = str(self._session.extra.get("last_retrieval_context", ""))
+        instructions = compose_realtime_instructions(
+            system_prompt=agent_prompt,
+            presentation_id=self._session.presentation_id,
+            current_page=self._current_page,
+            auto_present_pages=auto_present_pages,
+            last_retrieval_context=last_context,
+        )
+        tool_decls = openai_tools_to_gemini(REALTIME_TOOLS)
+        model = self._settings.gemini_live_model
+        voice = self._settings.gemini_live_voice or "Kore"
+
+        config = types.LiveConnectConfig(
+            response_modalities=["AUDIO"],
+            system_instruction=instructions,
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
+                )
+            ),
+            tools=[types.Tool(function_declarations=tool_decls)] if tool_decls else None,
+            output_audio_transcription=types.AudioTranscriptionConfig(),
+            input_audio_transcription=types.AudioTranscriptionConfig(),
+        )
+
+        client = genai.Client(
+            api_key=self._settings.gemini_api_key,
+            http_options={"api_version": "v1alpha"},
+        )
+        async with client.aio.live.connect(model=model, config=config) as session:
+            self._gemini_session = session
+            self._connected_monotonic = time.monotonic()
+            relay_registry.register(self._session.session_id, session, self)
+            logger.info(
+                "Realtime relay connected provider=gemini session_id=%s model=%s",
+                self._session.session_id,
+                model,
+            )
+            await self._set_state(
+                relay_status="connected",
+                relay_connected_at=_now_utc_iso(),
+                relay_last_error=None,
+                realtime_provider="gemini",
+            )
+            await self._browser_ws.send_text(json.dumps({
+                "type": "session.created",
+                "session": {"id": self._session.session_id, "provider": "gemini"},
+            }))
+            await self._browser_ws.send_text(json.dumps({
+                "type": "session.updated",
+                "session": {"id": self._session.session_id, "provider": "gemini"},
+            }))
+
+            await self._inject_session_start_greeting_gemini(session)
+
+            browser_task = asyncio.create_task(self._pump_browser_to_gemini())
+            gemini_task = asyncio.create_task(self._pump_gemini_to_browser())
+            done, pending = await asyncio.wait(
+                [browser_task, gemini_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in done:
+                err = task.exception()
+                if err:
+                    raise err
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+
+    async def _inject_session_start_greeting_gemini(self, session) -> None:
+        if self._auto_present_limit > 0:
+            self._auto_present_page = 1
+            await ws_manager.broadcast_json(
+                self._session.session_id,
+                {"type": "navigate", "target_page": 1},
+            )
+            slide_content = ""
+            slide_title = ""
+            try:
+                from services import storage as storage_mod
+                pages = storage_mod.load_index_pages(self._session.presentation_id)
+                for page in (pages or []):
+                    if int(page.get("page_number", 0)) == 1:
+                        slide_content = str(
+                            page.get("searchable_content") or page.get("content_text") or ""
+                        ).strip()[:1500]
+                        slide_title = str(page.get("title") or "")
+                        break
+            except Exception:
+                pass
+            if slide_content:
+                text = (
+                    f"SESSION START. Slide 1 context (for your reference only — do NOT narrate yet):\n"
+                    f"Title: {slide_title}\n{slide_content}\n\n"
+                    "Greet the participants warmly, use the slide context to tease what this presentation is about "
+                    "in one compelling sentence, then ask if they're ready to begin."
+                )
+            else:
+                text = (
+                    "SESSION START. Greet the participants warmly and ask if they're ready "
+                    "to begin the presentation."
+                )
+        else:
+            text = "SESSION_START. Greet the participants warmly and ask how you can help."
+
+        await session.send_client_content(
+            turns={"role": "user", "parts": [{"text": text}]},
+            turn_complete=True,
+        )
+        logger.info("Gemini Live: injected greeting trigger at session start")
+
+    async def _pump_browser_to_gemini(self) -> None:
+        from google.genai import types
+
+        assert self._gemini_session is not None
+        while True:
+            incoming = await self._browser_ws.receive()
+            if incoming.get("type") == "websocket.disconnect":
+                raise WebSocketDisconnect()
+            message = incoming.get("text")
+            if message is None and incoming.get("bytes") is not None:
+                message = incoming["bytes"].decode("utf-8", errors="ignore")
+            if not message:
+                continue
+            maybe_event = _safe_json(message)
+            if not maybe_event:
+                continue
+            event_type = str(maybe_event.get("type") or "")
+            if event_type == "session.update":
+                continue
+            if event_type == "input_audio_buffer.append":
+                audio_b64 = str(maybe_event.get("audio") or "")
+                if not audio_b64:
+                    continue
+                pcm24 = decode_browser_pcm_b64(audio_b64)
+                pcm16 = resample_pcm16_mono(pcm24, 24000, 16000)
+                await self._gemini_session.send_realtime_input(
+                    audio=types.Blob(data=pcm16, mime_type="audio/pcm;rate=16000")
+                )
+                continue
+            if event_type in {"input_audio_buffer.commit", "input_audio_buffer.clear", "response.cancel"}:
+                continue
+            if event_type == "conversation.item.create":
+                item = maybe_event.get("item") if isinstance(maybe_event.get("item"), dict) else {}
+                content = item.get("content") if isinstance(item.get("content"), list) else []
+                texts = []
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "input_text":
+                        texts.append(str(part.get("text") or ""))
+                joined = "\n".join(t for t in texts if t).strip()
+                if joined:
+                    await self._gemini_session.send_client_content(
+                        turns={"role": "user", "parts": [{"text": joined}]},
+                        turn_complete=True,
+                    )
+
+    async def _pump_gemini_to_browser(self) -> None:
+        assert self._gemini_session is not None
+        response_id: str | None = None
+        item_id: str | None = None
+        turn_started = False
+        try:
+            async for chunk in self._gemini_session.receive():
+                await self._set_state(relay_last_event_at=_now_utc_iso())
+                if getattr(chunk, "tool_call", None):
+                    await self._handle_gemini_tool_call(chunk.tool_call)
+                    continue
+                server_content = getattr(chunk, "server_content", None)
+                if not server_content:
+                    continue
+                if getattr(server_content, "interrupted", False):
+                    speech_item = new_item_id()
+                    await self._browser_ws.send_text(json.dumps({
+                        "event_id": f"evt_{speech_item}",
+                        "type": "input_audio_buffer.speech_started",
+                        "item_id": speech_item,
+                        "audio_start_ms": 0,
+                    }))
+                    if self._auto_present_limit > 0 and not self._session.extra.get("muted"):
+                        if self._auto_present_page < self._auto_present_limit and self._model_has_narrated:
+                            await self._auto_advance_on_speech()
+
+                async def ensure_turn() -> tuple[str, str]:
+                    nonlocal response_id, item_id, turn_started
+                    if turn_started and response_id and item_id:
+                        return response_id, item_id
+                    response_id = new_response_id()
+                    item_id = new_item_id()
+                    turn_started = True
+                    for evt in presenter_turn_start_events(response_id=response_id, item_id=item_id):
+                        await self._browser_ws.send_text(json.dumps(evt))
+                    return response_id, item_id
+
+                model_turn = getattr(server_content, "model_turn", None)
+                if model_turn and getattr(model_turn, "parts", None):
+                    for part in model_turn.parts:
+                        inline = getattr(part, "inline_data", None)
+                        if inline and getattr(inline, "data", None):
+                            pcm = inline.data
+                            if isinstance(pcm, str):
+                                pcm = decode_browser_pcm_b64(pcm)
+                            await self._record_first_audio_latency()
+                            if self._session.extra.get("muted") or self._in_chat_response:
+                                continue
+                            rid, iid = await ensure_turn()
+                            await self._browser_ws.send_text(
+                                json.dumps(presenter_audio_delta_event(
+                                    item_id=iid,
+                                    pcm_b64=encode_pcm_b64(pcm),
+                                ))
+                            )
+                out_tx = getattr(server_content, "output_transcription", None)
+                if out_tx is not None:
+                    text = getattr(out_tx, "text", None) or str(out_tx)
+                    if text and not self._session.extra.get("muted"):
+                        rid, iid = await ensure_turn()
+                        await self._browser_ws.send_text(
+                            json.dumps(presenter_transcript_delta_event(item_id=iid, text=text))
+                        )
+                        if self._in_chat_response:
+                            self._chat_reply_buffer.append(text)
+                if getattr(server_content, "turn_complete", False):
+                    if turn_started and response_id and item_id:
+                        for evt in presenter_turn_end_events(response_id=response_id, item_id=item_id):
+                            await self._browser_ws.send_text(json.dumps(evt))
+                    turn_started = False
+                    response_id = None
+                    item_id = None
+                    if self._in_chat_response:
+                        await self._finish_chat_response_from_buffer()
+                    if not self._model_has_narrated:
+                        self._model_has_narrated = True
+        except Exception as exc:
+            logger.error("Gemini receive loop failed session_id=%s: %s", self._session.session_id, exc)
+            raise
+
+    async def _handle_gemini_tool_call(self, tool_call) -> None:
+        from google.genai import types
+
+        assert self._gemini_session is not None
+        function_responses = []
+        for fc in getattr(tool_call, "function_calls", None) or []:
+            call_id = str(getattr(fc, "id", None) or "")
+            tool_name = str(getattr(fc, "name", None) or "")
+            args = parse_tool_args(getattr(fc, "args", None))
+            self._tool_calls += 1
+            logger.info(
+                "⏱ [1] GEMINI_TOOL_CALL session_id=%s tool=%s call_id=%s",
+                self._session.session_id, tool_name, call_id,
+            )
+            _MUTE_ALLOWED_TOOLS = {"unmute_self", "mute_self"}
+            if self._session.extra.get("muted") and tool_name not in _MUTE_ALLOWED_TOOLS:
+                output = {"ok": False, "reason": "muted"}
+            else:
+                if tool_name == "search_and_answer":
+                    filler_b64 = get_random_filler_b64()
+                    if filler_b64:
+                        await ws_manager.broadcast_json(
+                            self._session.session_id,
+                            {"type": "play_filler", "audio_b64": filler_b64},
+                        )
+                await ws_manager.broadcast_json(
+                    self._session.session_id,
+                    {"type": "tool_start", "call_id": call_id, "tool_name": tool_name},
+                )
+                try:
+                    output = await self._tool_executor.execute(
+                        session_id=self._session.session_id,
+                        tool_name=tool_name,
+                        raw_arguments=args,
+                    )
+                except Exception as exc:
+                    self._tool_failures += 1
+                    output = {"ok": False, "error": str(exc), "tool_name": tool_name}
+                    await self._increment_error(str(exc))
+                if output.get("action") != "async_job_started":
+                    await ws_manager.broadcast_json(
+                        self._session.session_id,
+                        {"type": "tool_done", "call_id": call_id, "tool_name": tool_name},
+                    )
+                new_page = output.get("page_number")
+                if new_page and int(new_page) != self._current_page:
+                    self._current_page = int(new_page)
+                if output.get("action") == "async_job_started":
+                    asyncio.create_task(self._simulate_external_job(output.get("query", "unknown"), call_id))
+
+            await self._set_state(tool_calls=self._tool_calls, tool_failures=self._tool_failures)
+            function_responses.append(
+                types.FunctionResponse(
+                    id=call_id,
+                    name=tool_name,
+                    response=output if isinstance(output, dict) else {"result": output},
+                )
+            )
+        if function_responses:
+            await self._gemini_session.send_tool_response(function_responses=function_responses)
+            # Page context after tool response so Live is not interrupted mid-tool-cycle.
+            await self._push_session_update()
+
+    async def _finish_chat_response_from_buffer(self) -> None:
+        full_text = "".join(self._chat_reply_buffer).strip()
+        self._in_chat_response = False
+        self._chat_reply_buffer = []
+        reply_sender = self._chat_reply_sender or "Unknown"
+        self._chat_reply_sender = None
+        if not full_text:
+            return
+        recall_bot_id = getattr(self._session, "recall_bot_id", None)
+        if not recall_bot_id:
+            return
+        try:
+            from services.recall_client import RecallClient
+            client = RecallClient(self._settings)
+            await client.send_chat_message(recall_bot_id, full_text)
+            await ws_manager.broadcast_json(
+                self._session.session_id,
+                {"type": "chat_message", "sender": "Bot", "text": full_text, "direction": "outgoing"},
+            )
+            logger.info(
+                "Chat reply sent to meeting session_id=%s sender=%s: %r",
+                self._session.session_id, reply_sender, full_text[:80],
+            )
+        except Exception as exc:
+            logger.error("Failed to send chat reply session_id=%s: %s", self._session.session_id, exc)
+
     async def _run_demo_passthrough(self, uri: str, headers: dict[str, str]) -> None:
         logger.info("Realtime relay using demo profile session_id=%s", self._session.session_id)
         async with ws_connect(
             uri,
             extra_headers=headers,
-            subprotocols=["realtime"],
             ping_interval=20,
             ping_timeout=20,
             max_size=None,
@@ -310,7 +735,7 @@ class _RealtimeRelayRuntime:
 
             initial = await openai_ws.recv()
             await self._set_state(relay_last_event_at=_now_utc_iso())
-            await self._browser_ws.send_text(initial)
+            await self._browser_ws.send_text(_openai_message_for_browser(initial))
 
             async def browser_to_openai() -> None:
                 while True:
@@ -324,8 +749,11 @@ class _RealtimeRelayRuntime:
                 while True:
                     message = await openai_ws.recv()
                     payload = _safe_json(message)
-                    if payload and str(payload.get("type") or "") == "response.audio.delta":
-                        await self._record_first_audio_latency()
+                    if payload:
+                        payload = _normalize_openai_event(payload)
+                        if str(payload.get("type") or "") == "response.audio.delta":
+                            await self._record_first_audio_latency()
+                        message = json.dumps(payload)
                     await self._set_state(relay_last_event_at=_now_utc_iso())
                     await self._browser_ws.send_text(message)
 
@@ -346,7 +774,14 @@ class _RealtimeRelayRuntime:
         assert self._openai_ws is not None
         msg_count = 0
         while True:
-            message = await self._browser_ws.receive_text()
+            incoming = await self._browser_ws.receive()
+            if incoming.get("type") == "websocket.disconnect":
+                raise WebSocketDisconnect()
+            message = incoming.get("text")
+            if message is None and incoming.get("bytes") is not None:
+                message = incoming["bytes"].decode("utf-8", errors="ignore")
+            if not message:
+                continue
             msg_count += 1
             maybe_event = _safe_json(message)
             event_type = maybe_event.get("type", "unknown") if maybe_event else "non-json"
@@ -375,7 +810,9 @@ class _RealtimeRelayRuntime:
                 payload = _safe_json(message)
                 should_forward = True
                 if payload:
+                    payload = _normalize_openai_event(payload)
                     should_forward = await self._handle_openai_event(payload)
+                    message = json.dumps(payload)
                 if should_forward:
                     try:
                         await self._browser_ws.send_text(message)
@@ -392,6 +829,7 @@ class _RealtimeRelayRuntime:
         event_type = str(payload.get("type") or "")
 
         if event_type == "input_audio_buffer.speech_started":
+            logger.info("VAD speech_started session_id=%s", self._session.session_id)
             # Auto-present: advance slide when user speaks (only when not muted)
             if (not self._session.extra.get("muted")
                     and self._auto_present_limit > 0
@@ -527,16 +965,11 @@ class _RealtimeRelayRuntime:
         return True
 
     async def handle_incoming_chat(self, sender: str, text: str) -> bool:
-        """Inject a meeting chat message into OpenAI and reply text-only back to the meeting.
-
-        The relay requests a text-only response (modalities=["text"]) so OpenAI does NOT
-        produce audio. The response.text.delta events are captured in
-        _chat_reply_buffer and, on response.done, the assembled text is sent back to
-        the meeting via Recall's send_chat_message API.
-        """
+        """Inject a meeting chat message and reply text-only back to the meeting."""
+        if self._provider == "gemini":
+            return await self._handle_incoming_chat_gemini(sender, text)
         if self._openai_ws is None:
             return False
-        # Guard against concurrent chat requests (queue at most one at a time)
         if self._in_chat_response:
             logger.warning(
                 "handle_incoming_chat: previous chat response still in flight, queuing sender=%s",
@@ -546,13 +979,13 @@ class _RealtimeRelayRuntime:
         self._chat_reply_sender = sender
         self._chat_reply_buffer = []
         try:
-            # Disable VAD so OpenAI cannot auto-fire a voice response from
-            # incoming audio while we wait for the text-only reply.
             await self._openai_ws.send(json.dumps({
                 "type": "session.update",
-                "session": {"turn_detection": None},
+                "session": {
+                    "type": "realtime",
+                    "audio": {"input": {"turn_detection": None}},
+                },
             }))
-            # Cancel any in-flight audio response and flush the audio buffer.
             await self._openai_ws.send(json.dumps({"type": "response.cancel"}))
             await self._openai_ws.send(json.dumps({"type": "input_audio_buffer.clear"}))
             await self._openai_ws.send(
@@ -572,7 +1005,7 @@ class _RealtimeRelayRuntime:
                 json.dumps({
                     "type": "response.create",
                     "response": {
-                        "modalities": ["text"],
+                        "output_modalities": ["text"],
                         "instructions": (
                             "A meeting participant sent you a text chat message. "
                             "Reply concisely (1-3 sentences). "
@@ -591,6 +1024,79 @@ class _RealtimeRelayRuntime:
             self._chat_reply_buffer = []
             self._chat_reply_sender = None
             logger.error("handle_incoming_chat failed session_id=%s: %s", self._session.session_id, exc)
+            return False
+
+    async def _handle_incoming_chat_gemini(self, sender: str, text: str) -> bool:
+        if self._gemini_session is None:
+            return False
+        self._in_chat_response = True
+        self._chat_reply_sender = sender
+        self._chat_reply_buffer = []
+        try:
+            await self._gemini_session.send_client_content(
+                turns={
+                    "role": "user",
+                    "parts": [{
+                        "text": (
+                            f"[MEETING CHAT from {sender}]: {text}\n\n"
+                            "Reply concisely in 1-3 sentences. Your spoken audio will be ignored; "
+                            "keep the answer short."
+                        ),
+                    }],
+                },
+                turn_complete=True,
+            )
+            return True
+        except Exception as exc:
+            self._in_chat_response = False
+            self._chat_reply_buffer = []
+            self._chat_reply_sender = None
+            logger.error("Gemini handle_incoming_chat failed session_id=%s: %s", self._session.session_id, exc)
+            return False
+
+    async def handle_incoming_voice_prompt(self, sender: str, text: str) -> bool:
+        """Speak a reply to an injected meeting chat (unmute greetings, etc.)."""
+        if self._provider == "gemini" and self._gemini_session is not None:
+            try:
+                await self._gemini_session.send_client_content(
+                    turns={
+                        "role": "user",
+                        "parts": [{
+                            "text": (
+                                f"[MEETING CHAT from {sender}]: {text}\n\n"
+                                "Respond to this naturally and briefly via speech."
+                            ),
+                        }],
+                    },
+                    turn_complete=True,
+                )
+                return True
+            except Exception as exc:
+                logger.error("Gemini voice inject failed session_id=%s: %s", self._session.session_id, exc)
+                return False
+        if self._openai_ws is None:
+            return False
+        try:
+            await self._openai_ws.send(
+                json.dumps({
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{
+                            "type": "input_text",
+                            "text": (
+                                f"[MEETING CHAT from {sender}]: {text}\n\n"
+                                "Respond to this naturally and briefly via speech."
+                            ),
+                        }],
+                    },
+                })
+            )
+            await self._openai_ws.send(json.dumps({"type": "response.create"}))
+            return True
+        except Exception as exc:
+            logger.error("OpenAI voice inject failed session_id=%s: %s", self._session.session_id, exc)
             return False
 
     async def _handle_function_call(self, item: dict) -> None:
@@ -712,9 +1218,7 @@ class _RealtimeRelayRuntime:
             await self._push_session_update()
 
     async def _push_session_update(self) -> None:
-        """Push a session.update to OpenAI with the latest instructions and page context."""
-        if self._openai_ws is None:
-            return
+        """Push latest instructions / page context to the active realtime provider."""
         agent_prompt = str(
             self._session.extra.get("agent_system_prompt")
             or "You are Overtone, a live voice assistant."
@@ -723,6 +1227,31 @@ class _RealtimeRelayRuntime:
             self._session.extra.get("auto_present_pages") or 0
         )
         last_context = str(self._session.extra.get("last_retrieval_context", ""))
+        if self._provider == "gemini" and self._gemini_session is not None:
+            instructions = compose_realtime_instructions(
+                system_prompt=agent_prompt,
+                presentation_id=self._session.presentation_id,
+                current_page=self._current_page,
+                auto_present_pages=auto_present_pages,
+                last_retrieval_context=last_context,
+            )
+            # Live sessions fix system_instruction at connect; inject a silent context note.
+            await self._gemini_session.send_client_content(
+                turns={
+                    "role": "user",
+                    "parts": [{
+                        "text": (
+                            f"[CONTEXT UPDATE — do not speak this aloud]\n"
+                            f"Now on page {self._current_page}.\n{instructions[-1500:]}"
+                        ),
+                    }],
+                },
+                turn_complete=False,
+            )
+            logger.info("Pushed Gemini context update for page %d", self._current_page)
+            return
+        if self._openai_ws is None:
+            return
         await self._openai_ws.send(
             json.dumps(
                 _session_update_payload(
@@ -753,16 +1282,11 @@ class _RealtimeRelayRuntime:
         await store.register_session(self._session)
         await self._push_session_update()
         
-        if self._openai_ws is None:
+        if self._openai_ws is None and self._gemini_session is None:
             return
 
         try:
-            
-            print(f"DEBUG: Processing complete. Result: {search_data}")
             logger.info("✅ [BACKGROUND JOB] Processing complete. Injecting into session_id=%s", self._session.session_id)
-            
-            # Ask the participant for permission before sharing the data.
-            # The model will only walk through the results if they confirm.
             injection_text = (
                 f"NOTIFICATION: The external search for '{query}' has completed. "
                 "Do NOT share the data yet. First, tell the participant the results are in and ask: "
@@ -770,50 +1294,18 @@ class _RealtimeRelayRuntime:
                 "Wait for their response. Only if they say yes, share and explain the following data: "
                 f"{search_data}"
             )
-            
-            print("DEBUG: Sending conversation.item.create (role: user) to OpenAI")
-            await self._openai_ws.send(
-                json.dumps({
-                    "type": "conversation.item.create",
-                    "item": {
-                        "type": "message",
-                        "role": "user", 
-                        "content": [{
-                            "type": "input_text", 
-                            "text": injection_text
-                        }],
-                    },
-                })
-            )
-            
-            # Force the model to read out the result
-            print("DEBUG: Triggering response.create")
-            await self._openai_ws.send(json.dumps({"type": "response.create"}))
-
-            # FINALLY broadcast tool_done so the toast disappears
+            await self._inject_user_text(injection_text, turn_complete=True)
             await ws_manager.broadcast_json(
                 self._session.session_id,
                 {"type": "tool_done", "call_id": call_id, "tool_name": "fetch_external_data"},
             )
-
         except Exception as e:
-            print(f"❌ DEBUG: Background job error: {e}")
             logger.error("❌ [BACKGROUND JOB] Failed for session_id=%s: %s", self._session.session_id, e)
             try:
-                await self._openai_ws.send(
-                    json.dumps({
-                        "type": "conversation.item.create",
-                        "item": {
-                            "type": "message",
-                            "role": "user",
-                            "content": [{
-                                "type": "input_text", 
-                                "text": f"[SYSTEM ERROR: The processing for '{query}' failed. Inform the user.]"
-                            }],
-                        },
-                    })
+                await self._inject_user_text(
+                    f"[SYSTEM ERROR: The processing for '{query}' failed. Inform the user.]",
+                    turn_complete=True,
                 )
-                await self._openai_ws.send(json.dumps({"type": "response.create"}))
             except Exception:
                 pass
 
@@ -825,7 +1317,7 @@ class _RealtimeRelayRuntime:
         new slide context available. The model narrates the new slide naturally
         as part of its response.
         """
-        if self._openai_ws is None:
+        if self._openai_ws is None and self._gemini_session is None:
             return
 
         next_page = self._auto_present_page + 1
@@ -879,16 +1371,30 @@ class _RealtimeRelayRuntime:
                 "and immediately call leave_call."
             )
 
+        await self._inject_user_text(prompt, turn_complete=False)
+
+    async def _inject_user_text(self, text: str, *, turn_complete: bool = True) -> None:
+        if self._provider == "gemini" and self._gemini_session is not None:
+            await self._gemini_session.send_client_content(
+                turns={"role": "user", "parts": [{"text": text}]},
+                turn_complete=turn_complete,
+            )
+            return
+        if self._openai_ws is None:
+            return
         await self._openai_ws.send(
             json.dumps({
                 "type": "conversation.item.create",
                 "item": {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": prompt}],
+                    "content": [{"type": "input_text", "text": text}],
                 },
             })
         )
+        # Only force a spoken reply when turn_complete=True (OpenAI needs response.create).
+        if turn_complete:
+            await self._openai_ws.send(json.dumps({"type": "response.create"}))
 
     async def _record_first_audio_latency(self) -> None:
         if self._connected_monotonic is None:

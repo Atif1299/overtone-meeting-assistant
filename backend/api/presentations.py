@@ -87,12 +87,12 @@ async def upload_direct_init(
         raise HTTPException(413, f"File exceeds {settings.max_upload_bytes // 1_048_576} MB limit")
     blob_storage = AzureBlobStorageClient(settings)
     if not blob_storage.enabled:
-        raise HTTPException(503, "Direct upload requires Azure Blob Storage to be configured")
+        raise HTTPException(503, "Direct upload requires GCS to be configured")
     slot = storage_mod.create_upload_slot(safe_name)
     blob_name = f"{slot.presentation_id}/source/{safe_name}"
     sas_url = blob_storage.generate_upload_sas_url(
         blob_name=blob_name,
-        ttl_minutes=settings.azure_blob_upload_sas_ttl_minutes,
+        ttl_minutes=settings.gcs_signed_url_ttl_minutes or settings.azure_blob_upload_sas_ttl_minutes,
     )
     if not sas_url:
         raise HTTPException(500, "Failed to generate upload URL")
@@ -247,10 +247,17 @@ async def get_slide_image(
     presentation_id: str, page_number: int
 ) -> Response:
     page = await get_presentation_page(presentation_id, page_number)
-    if page.image_blob_name:
-        blob_storage = AzureBlobStorageClient(get_settings())
-        if blob_storage.enabled:
-            payload = await blob_storage.download_bytes(blob_name=page.image_blob_name)
+    blob_names = [
+        page.image_blob_name,
+        f"{presentation_id}/images/page_{page_number}.png",
+        f"{presentation_id}/pages/page_{page_number}.png",
+    ]
+    blob_storage = AzureBlobStorageClient(get_settings())
+    if blob_storage.enabled:
+        for blob_name in blob_names:
+            if not blob_name:
+                continue
+            payload = await blob_storage.download_bytes(blob_name=blob_name)
             if payload:
                 return Response(content=payload, media_type="image/png")
 

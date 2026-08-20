@@ -39,13 +39,22 @@ def _disabled_blob():
     return FakeBlob
 
 
-def test_indexer_builds_local_pages_and_rag_hits(monkeypatch) -> None:
+def test_indexer_builds_local_pages_and_rag_hits(monkeypatch, tmp_path) -> None:
     uploaded = storage_mod.save_upload(
         "deck.pdf",
         b"%PDF-1.4 VoiceNav architecture overview. Integration testing checklist and webhook verification.",
     )
+    page = tmp_path / "page_1.png"
+    page.write_bytes(b"png")
 
-    monkeypatch.setattr(pipeline, "_run_vision_pipeline", AsyncMock(return_value=FAKE_PAGES))
+    async def fake_convert(_source, _presentation_id):
+        return {"page_images": [str(page)]}
+
+    class _Converter:
+        convert_to_page_images = staticmethod(fake_convert)
+
+    monkeypatch.setattr(pipeline, "converter_mod", _Converter)
+    monkeypatch.setattr(pipeline, "_run_vision_pipeline", AsyncMock(return_value=(FAKE_PAGES, "vision", "gpt-4o")))
     monkeypatch.setattr(pipeline, "_upload_to_search", AsyncMock(return_value=1))
     monkeypatch.setattr(pipeline, "_save_manifest", MagicMock())
     monkeypatch.setattr(pipeline, "AzureBlobStorageClient", _disabled_blob())

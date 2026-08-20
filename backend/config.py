@@ -25,19 +25,30 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
     openai_model: str = "gpt-4o"
-    openai_realtime_model: str = "gpt-realtime-2.1"
+    openai_realtime_model: str = "gpt-realtime"
     openai_realtime_voice: str = "alloy"
-    openai_realtime_vad_threshold: float = 0.7
-    openai_realtime_vad_silence_ms: int = 700
+    openai_realtime_vad_threshold: float = 0.4
+    openai_realtime_vad_silence_ms: int = 600
     openai_realtime_vad_prefix_padding_ms: int = 300
     openai_realtime_interrupt_response: bool = True
     voice_agent_mode: Literal["realtime", "webhook"] = "realtime"
+
+    # gemini | openai | auto (prefer gemini when GEMINI_API_KEY is set)
+    realtime_provider: Literal["auto", "openai", "gemini"] = "auto"
+    gemini_api_key: str = ""
+    gemini_live_model: str = "gemini-2.5-flash-native-audio-preview-12-2025"
+    gemini_live_voice: str = "Kore"
+    indexer_provider: Literal["auto", "openai", "gemini"] = "auto"
+    gemini_vision_model: str = "gemini-2.0-flash"
     azure_search_endpoint: str = ""
     azure_search_key: str = ""
     azure_search_index_name: str = "overtone"
     azure_blob_account_url: str = ""
     azure_blob_account_key: str = ""
     azure_blob_container_name: str = "presentations"
+
+    gcs_bucket: str = ""
+    gcs_signed_url_ttl_minutes: int = 30
 
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
@@ -63,7 +74,7 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-opus-4-5"
-    indexer_llm_model: str = ""  # overrides anthropic_model for vision extraction if set
+    indexer_llm_model: str = ""  # OpenAI Vision model; defaults to gpt-4o
 
     pdftoppm_path: str = ""  # path to pdftoppm binary for PDF to image conversion
 
@@ -71,3 +82,23 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def effective_realtime_provider(settings: Settings | None = None) -> Literal["openai", "gemini"]:
+    s = settings or get_settings()
+    provider = s.realtime_provider
+    if provider == "gemini":
+        return "gemini" if s.gemini_api_key else "openai"
+    if provider == "openai":
+        return "openai"
+    return "gemini" if s.gemini_api_key else "openai"
+
+
+def effective_indexer_provider(settings: Settings | None = None) -> Literal["openai", "gemini"]:
+    s = settings or get_settings()
+    provider = s.indexer_provider
+    if provider == "gemini":
+        return "gemini" if s.gemini_api_key else "openai"
+    if provider == "openai":
+        return "openai"
+    return "gemini" if s.gemini_api_key else "openai"

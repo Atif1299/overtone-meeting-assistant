@@ -1,16 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
-
-from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
-from azure.storage.blob import (
-    BlobSasPermissions,
-    BlobServiceClient,
-    ContentSettings,
-    generate_blob_sas,
-)
+from datetime import timedelta
 
 from config import Settings
 
@@ -21,21 +13,19 @@ class BlobUploadResult:
     blob_url: str
 
 
-class AzureBlobStorageClient:
+class GcsStorageClient:
     def __init__(self, settings: Settings) -> None:
-        self._account_url = settings.azure_blob_account_url.rstrip("/")
-        self._account_key = settings.azure_blob_account_key.strip()
-        self._container_name = settings.azure_blob_container_name.strip() or "presentations"
-        self._service_client: BlobServiceClient | None = None
-        self._container_ready = False
+        self._bucket_name = (settings.gcs_bucket or "").strip()
+        self._client = None
+        self._bucket = None
 
     @property
     def enabled(self) -> bool:
-        return bool(self._account_url and self._account_key and self._container_name)
+        return bool(self._bucket_name)
 
     def blob_url(self, blob_name: str) -> str:
         normalized = blob_name.lstrip("/")
-        return f"{self._account_url}/{self._container_name}/{normalized}"
+        return f"https://storage.googleapis.com/{self._bucket_name}/{normalized}"
 
     async def upload_bytes(
         self, *, blob_name: str, payload: bytes, content_type: str
@@ -76,72 +66,49 @@ class AzureBlobStorageClient:
             return False
         return self._blob_exists_sync(blob_name)
 
+    def list_blob_names(self, prefix: str = "") -> list[str]:
+        if not self.enabled:
+            return []
+        bucket = self._gcs_client().bucket(self._bucket_name)
+        return [blob.name for blob in bucket.list_blobs(prefix=prefix)]
+
     def generate_upload_sas_url(self, *, blob_name: str, ttl_minutes: int = 30) -> str | None:
         if not self.enabled:
             return None
-        self._ensure_container_sync()
-        account_name = self._account_url.rstrip("/").split("/")[-1].split(".")[0]
-        expiry = datetime.now(timezone.utc) + timedelta(minutes=max(1, ttl_minutes))
-        sas = generate_blob_sas(
-            account_name=account_name,
-            container_name=self._container_name,
-            blob_name=blob_name.lstrip("/"),
-            account_key=self._account_key,
-            permission=BlobSasPermissions(read=True, create=True, write=True),
-            expiry=expiry,
-            content_type="application/octet-stream",
+        blob = self._blob(blob_name)
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(minutes=max(1, ttl_minutes)),
+            method="PUT",
         )
-        return f"{self.blob_url(blob_name)}?{sas}"
 
     def _upload_bytes_sync(
         self, blob_name: str, payload: bytes, content_type: str
     ) -> BlobUploadResult | None:
-        self._ensure_container_sync()
-        client = self._blob_client(blob_name)
-        client.upload_blob(
-            payload,
-            overwrite=True,
-            content_settings=ContentSettings(content_type=content_type),
-        )
+        blob = self._blob(blob_name)
+        blob.upload_from_string(payload, content_type=content_type)
         return BlobUploadResult(blob_name=blob_name, blob_url=self.blob_url(blob_name))
 
     def _download_bytes_sync(self, blob_name: str) -> bytes | None:
-        self._ensure_container_sync()
-        client = self._blob_client(blob_name)
-        try:
-            return client.download_blob().readall()
-        except ResourceNotFoundError:
+        blob = self._blob(blob_name)
+        if not blob.exists():
             return None
+        return blob.download_as_bytes()
 
     def _blob_exists_sync(self, blob_name: str) -> bool:
-        self._ensure_container_sync()
-        client = self._blob_client(blob_name)
-        try:
-            return bool(client.exists())
-        except ResourceNotFoundError:
-            return False
+        return bool(self._blob(blob_name).exists())
 
-    def _ensure_container_sync(self) -> None:
-        if not self.enabled or self._container_ready:
-            return
-        service = self._blob_service_client()
-        try:
-            service.create_container(name=self._container_name)
-        except ResourceExistsError:
-            pass
-        self._container_ready = True
+    def _gcs_client(self):
+        if self._client is None:
+            from google.cloud import storage
 
-    def _blob_service_client(self) -> BlobServiceClient:
-        if self._service_client is None:
-            self._service_client = BlobServiceClient(
-                account_url=self._account_url,
-                credential=self._account_key,
-            )
-        return self._service_client
+            self._client = storage.Client()
+        return self._client
 
-    def _blob_client(self, blob_name: str):
-        service = self._blob_service_client()
-        return service.get_blob_client(
-            container=self._container_name,
-            blob=blob_name.lstrip("/"),
-        )
+    def _blob(self, blob_name: str):
+        if self._bucket is None:
+            self._bucket = self._gcs_client().bucket(self._bucket_name)
+        return self._bucket.blob(blob_name.lstrip("/"))
+
+
+AzureBlobStorageClient = GcsStorageClient

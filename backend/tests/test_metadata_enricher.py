@@ -30,16 +30,19 @@ SAMPLE_METADATA = {
 }
 
 
+def _openai_response(payload: dict) -> MagicMock:
+    fake_response = MagicMock()
+    fake_response.choices = [MagicMock(message=MagicMock(content=json.dumps(payload)))]
+    return fake_response
+
+
 def test_extract_slide_metadata_parses_json(tmp_path):
-    """extract_slide_metadata sends image + prompt to Claude and parses JSON response."""
+    """extract_slide_metadata sends image + prompt to OpenAI Vision and parses JSON."""
     img = tmp_path / "page_1.png"
     img.write_bytes(b"fake png bytes")
 
-    fake_response = MagicMock()
-    fake_response.content = [MagicMock(text=json.dumps(SAMPLE_METADATA))]
-
     fake_client = MagicMock()
-    fake_client.messages.create = AsyncMock(return_value=fake_response)
+    fake_client.chat.completions.create = AsyncMock(return_value=_openai_response(SAMPLE_METADATA))
 
     result = asyncio.run(
         extract_slide_metadata(
@@ -55,11 +58,11 @@ def test_extract_slide_metadata_parses_json(tmp_path):
     assert result["section_label"] == "Architecture"
     assert result["has_diagram"] is True
     assert result["has_table"] is False
-    fake_client.messages.create.assert_awaited_once()
+    fake_client.chat.completions.create.assert_awaited_once()
 
 
 def test_extract_slide_metadata_passes_image_as_base64(tmp_path):
-    """The image data is base64-encoded in the message content."""
+    """The image data is base64-encoded as a data URL in the message content."""
     import base64
 
     img_bytes = b"fake png content"
@@ -70,12 +73,10 @@ def test_extract_slide_metadata_passes_image_as_base64(tmp_path):
 
     async def capture_create(**kwargs):
         captured["kwargs"] = kwargs
-        fake_resp = MagicMock()
-        fake_resp.content = [MagicMock(text=json.dumps(SAMPLE_METADATA))]
-        return fake_resp
+        return _openai_response(SAMPLE_METADATA)
 
     fake_client = MagicMock()
-    fake_client.messages.create = capture_create
+    fake_client.chat.completions.create = capture_create
 
     asyncio.run(
         extract_slide_metadata(
@@ -88,10 +89,9 @@ def test_extract_slide_metadata_passes_image_as_base64(tmp_path):
     )
 
     content = captured["kwargs"]["messages"][0]["content"]
-    image_block = next(b for b in content if b.get("type") == "image")
+    image_block = next(b for b in content if b.get("type") == "image_url")
     expected_b64 = base64.standard_b64encode(img_bytes).decode("utf-8")
-    assert image_block["source"]["data"] == expected_b64
-    assert image_block["source"]["media_type"] == "image/png"
+    assert image_block["image_url"]["url"] == f"data:image/png;base64,{expected_b64}"
 
 
 def test_extract_all_pages_returns_ordered_results(tmp_path):
@@ -125,7 +125,7 @@ def test_extract_all_pages_returns_ordered_results(tmp_path):
 
 
 def test_extract_all_pages_respects_concurrency_limit(tmp_path):
-    """No more than `concurrency` Claude calls run simultaneously."""
+    """No more than `concurrency` Vision calls run simultaneously."""
     import asyncio as aio
 
     pages = [str(tmp_path / f"p{i}.png") for i in range(6)]

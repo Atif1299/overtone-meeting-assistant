@@ -6,9 +6,10 @@ export default function BotConfigForm({
   onSubmit,
   disabled,
 }) {
+  const readyPresentations = presentations.filter((presentation) => presentation.status === "ready");
   const selectedAgent = agents.find((agent) => agent.agent_name === (value.agent_name || "default"));
   const suggestedPresentationId = selectedAgent?.active_presentation_id || "";
-  const selectedPresentation = presentations.find(
+  const selectedPresentation = readyPresentations.find(
     (presentation) => presentation.presentation_id === value.presentation_id
   );
 
@@ -87,7 +88,7 @@ export default function BotConfigForm({
         </label>
         <label className="field">
           Presentation (knowledge base filter)
-          {presentations.length > 0 ? (
+          {readyPresentations.length > 0 ? (
             <select
               className="input"
               value={value.presentation_id || ""}
@@ -96,7 +97,7 @@ export default function BotConfigForm({
               <option value="" disabled>
                 Select presentation
               </option>
-              {presentations.map((presentation) => (
+              {readyPresentations.map((presentation) => (
                 <option key={presentation.presentation_id} value={presentation.presentation_id}>
                   {presentation.filename} ({presentation.presentation_id})
                 </option>

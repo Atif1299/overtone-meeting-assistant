@@ -62,7 +62,16 @@ async def inject_chat_message(
     if relay is not None and not voice_reply:
         return await relay.handle_incoming_chat(sender, text)
 
-    # --- Voice reply (unmute greeting) or legacy fallback ---
+    if relay is not None and voice_reply and hasattr(relay, "handle_incoming_voice_prompt"):
+        return await relay.handle_incoming_voice_prompt(sender, text)
+
+    # --- Voice reply (unmute greeting) or legacy OpenAI fallback ---
+    if openai_ws is None or not hasattr(openai_ws, "send"):
+        logger.warning(
+            "Relay registry: cannot inject voice chat for session_id=%s (non-OpenAI socket)",
+            session_id,
+        )
+        return False
     try:
         await openai_ws.send(
             json.dumps({

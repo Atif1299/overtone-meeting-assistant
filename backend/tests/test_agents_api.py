@@ -11,9 +11,10 @@ def test_agents_default_seed_exists(client: TestClient) -> None:
     assert any(agent["agent_name"] == "default" for agent in payload)
 
 
-def test_agents_create_and_activate_versions(client: TestClient) -> None:
+def test_agents_create_and_activate_versions(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setattr("api.presentations.dispatch_index_job", lambda _presentation_id: True)
     upload = client.post(
-        "/api/upload",
+        "/api/v1/presentations",
         files={"file": ("deck.pdf", b"%PDF-1.4 fake content", "application/pdf")},
     )
     assert upload.status_code == 200

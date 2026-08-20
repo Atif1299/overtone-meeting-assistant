@@ -1,4 +1,4 @@
-"""Presentation indexing orchestrator — provided metadata + Claude Vision fallback pipeline."""
+"""Presentation indexing orchestrator — provided metadata + OpenAI Vision fallback pipeline."""
 
 from __future__ import annotations
 
@@ -29,8 +29,8 @@ async def run_index_job(presentation_id: str) -> None:
       1. Get source file (local or download from blob)
       2. Convert to per-page PNGs (LibreOffice + pdftoppm)
       3a. Use provided_metadata.json if present and valid
-      3b. Fallback: Claude Vision extraction per page + document metadata generation
-      4. Upload to Azure AI Search (vectors + keyword)
+      3b. Fallback: OpenAI Vision extraction per page + document metadata generation
+      4. Upload to pgvector (vectors + keyword)
       5. Save manifest.json
       6. Update presentation status
     """
@@ -78,6 +78,7 @@ async def run_index_job(presentation_id: str) -> None:
             pass
 
     # 1. Convert to images for the UI
+    conversion_error: Exception | None = None
     try:
         conversion = await converter_mod.convert_to_page_images(str(source), presentation_id)
         page_images = conversion["page_images"]  # list[str] of file paths
@@ -99,11 +100,12 @@ async def run_index_job(presentation_id: str) -> None:
                 except Exception:
                     pass
     except Exception as exc:
+        conversion_error = exc
         logger.warning(f"Image conversion failed: {exc}")
         blob_urls = {}
         page_images = []
 
-    # 2. Build page metadata: try provided_metadata.json first, fall back to Claude Vision
+    # 2. Build page metadata: try provided_metadata.json first, fall back to OpenAI Vision
     user_metadata = storage_mod.load_provided_metadata(presentation_id)
     has_provided = bool(user_metadata and user_metadata.get("pages"))
 
@@ -124,30 +126,24 @@ async def run_index_job(presentation_id: str) -> None:
             )
             return
     else:
-        # Claude Vision fallback
-        logger.info("[%s] No provided metadata — falling back to Claude Vision extraction", presentation_id)
+        # OpenAI Vision fallback
+        logger.info("[%s] No provided metadata — falling back to OpenAI Vision extraction", presentation_id)
         if not page_images:
             storage_mod.update_presentation_meta(
                 presentation_id,
                 status="failed",
-                index_error="No provided metadata and no slide images available for Vision extraction",
-                indexed_pages=0,
-                total_pages=0,
-            )
-            return
-
-        if not settings.anthropic_api_key:
-            storage_mod.update_presentation_meta(
-                presentation_id,
-                status="failed",
-                index_error="No provided metadata and ANTHROPIC_API_KEY is not configured for Vision fallback",
+                index_error=(
+                    str(conversion_error)
+                    if conversion_error
+                    else "No provided metadata and no slide images available for Vision extraction"
+                ),
                 indexed_pages=0,
                 total_pages=0,
             )
             return
 
         try:
-            page_metadata_list, metadata_provider, metadata_model = await _run_vision_extraction(
+            page_metadata_list, metadata_provider, metadata_model = await _run_vision_pipeline(
                 presentation_id=presentation_id,
                 page_images=page_images,
                 blob_urls=blob_urls,
@@ -155,11 +151,11 @@ async def run_index_job(presentation_id: str) -> None:
                 settings=settings,
             )
         except Exception as exc:
-            logger.exception("[%s] Claude Vision extraction failed: %s", presentation_id, exc)
+            logger.exception("[%s] OpenAI Vision extraction failed: %s", presentation_id, exc)
             storage_mod.update_presentation_meta(
                 presentation_id,
                 status="failed",
-                index_error=f"Claude Vision extraction failed: {exc}",
+                index_error=f"OpenAI Vision extraction failed: {exc}",
                 indexed_pages=0,
                 total_pages=0,
             )
@@ -170,7 +166,7 @@ async def run_index_job(presentation_id: str) -> None:
     # Save pages + chunks locally for RAG keyword fallback
     _save_local_index(presentation_id, page_metadata_list)
 
-    # Upload to Azure AI Search
+    # Upload to pgvector (Cloud SQL). Local keyword index is always written.
     azure_chunks = 0
     azure = AzureSearchClient(settings)
     if azure.enabled:
@@ -185,7 +181,7 @@ async def run_index_job(presentation_id: str) -> None:
             storage_mod.update_presentation_meta(
                 presentation_id,
                 status="failed",
-                index_error=f"Azure Search indexing failed: {exc}",
+                index_error=f"pgvector indexing failed: {exc}",
                 indexed_pages=total_pages,
                 total_pages=total_pages,
             )
@@ -273,7 +269,7 @@ def _build_metadata_from_provided(user_metadata: dict, blob_urls: dict) -> list[
     return result
 
 
-async def _run_vision_extraction(
+async def _run_vision_pipeline(
     *,
     presentation_id: str,
     page_images: list[str],
@@ -281,11 +277,23 @@ async def _run_vision_extraction(
     source: Path,
     settings: Settings,
 ) -> tuple[list[dict], str, str]:
-    """Run Claude Vision extraction and return (page_metadata_list, provider, model)."""
-    import anthropic
+    """Run Vision extraction and return (page_metadata_list, provider, model)."""
+    from config import effective_indexer_provider
 
-    vision_model = settings.indexer_llm_model or settings.anthropic_model or metadata_enricher_mod.CLAUDE_MODEL
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    provider = effective_indexer_provider(settings)
+    if provider == "gemini":
+        return await _run_gemini_vision_pipeline(
+            presentation_id=presentation_id,
+            page_images=page_images,
+            blob_urls=blob_urls,
+            source=source,
+            settings=settings,
+        )
+
+    if not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is not configured for Vision fallback")
+    vision_model = settings.indexer_llm_model or "gpt-4o"
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     try:
         raw_pages = await metadata_enricher_mod.extract_all_pages(
@@ -295,7 +303,6 @@ async def _run_vision_extraction(
             model=vision_model,
         )
 
-        # Generate document-level metadata from extracted pages
         doc_meta = {}
         try:
             doc_meta = await metadata_enricher_mod.extract_document_metadata(
@@ -307,7 +314,6 @@ async def _run_vision_extraction(
         except Exception as exc:
             logger.warning("[%s] Document metadata generation failed (non-fatal): %s", presentation_id, exc)
 
-        # Save generated metadata as provided_metadata.json so other services can use it
         full_metadata = {
             **doc_meta,
             "total_pages": len(raw_pages),
@@ -332,13 +338,70 @@ async def _run_vision_extraction(
         await client.close()
 
 
+async def _run_gemini_vision_pipeline(
+    *,
+    presentation_id: str,
+    page_images: list[str],
+    blob_urls: dict,
+    source: Path,
+    settings: Settings,
+) -> tuple[list[dict], str, str]:
+    """Run Gemini Vision extraction and return (page_metadata_list, provider, model)."""
+    if not settings.gemini_api_key:
+        raise RuntimeError("GEMINI_API_KEY is not configured for Vision indexing")
+    from google import genai
+
+    vision_model = settings.gemini_vision_model or "gemini-2.0-flash"
+    client = genai.Client(api_key=settings.gemini_api_key)
+    logger.info("[%s] Using Gemini Vision model=%s", presentation_id, vision_model)
+
+    raw_pages = await metadata_enricher_mod.extract_all_pages_gemini(
+        page_images=page_images,
+        filename=source.name,
+        client=client,
+        model=vision_model,
+    )
+
+    doc_meta = {}
+    try:
+        doc_meta = await metadata_enricher_mod.extract_document_metadata_gemini(
+            page_metadatas=raw_pages,
+            total_pages=len(raw_pages),
+            client=client,
+            model=vision_model,
+        )
+    except Exception as exc:
+        logger.warning("[%s] Gemini document metadata generation failed (non-fatal): %s", presentation_id, exc)
+
+    full_metadata = {
+        **doc_meta,
+        "total_pages": len(raw_pages),
+        "pages": raw_pages,
+    }
+    try:
+        dest_dir = storage_mod.presentations_root() / presentation_id
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        (dest_dir / "provided_metadata.json").write_text(json.dumps(full_metadata, indent=2))
+        logger.info("[%s] Saved Gemini Vision metadata to provided_metadata.json", presentation_id)
+    except Exception as exc:
+        logger.warning("[%s] Failed to save Gemini Vision metadata to disk: %s", presentation_id, exc)
+
+    page_metadata_list = []
+    for p_data in raw_pages:
+        entry = _build_page_metadata_entry(p_data, blob_urls)
+        if entry is not None:
+            page_metadata_list.append(entry)
+
+    return page_metadata_list, "gemini-vision", vision_model
+
+
 async def _upload_to_search(
     *,
     page_metadata_list: list[dict[str, Any]],
     presentation_id: str,
     settings: Settings,
 ) -> int:
-    """Generate embeddings and upload to Azure AI Search."""
+    """Generate embeddings and upload to pgvector."""
     openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     async def generate_embedding(text: str) -> list[float]:
@@ -349,25 +412,14 @@ async def _upload_to_search(
         return resp.data[0].embedding
 
     try:
-        await search_indexer_mod.ensure_index_exists(
-            settings.azure_search_endpoint,
-            settings.azure_search_key,
-        )
-        await search_indexer_mod.delete_document_chunks(
-            presentation_id,
-            settings.azure_search_endpoint,
-            settings.azure_search_key,
-        )
+        await search_indexer_mod.ensure_index_exists()
+        await search_indexer_mod.delete_document_chunks(presentation_id)
         docs = await search_indexer_mod.prepare_documents(
             page_metadata_list=page_metadata_list,
             presentation_id=presentation_id,
             generate_embedding=generate_embedding,
         )
-        return await search_indexer_mod.upload_documents(
-            docs,
-            settings.azure_search_endpoint,
-            settings.azure_search_key,
-        )
+        return await search_indexer_mod.upload_documents(docs)
     finally:
         await openai_client.close()
 
@@ -429,7 +481,7 @@ async def _download_source_blob(
     presentation_meta: dict[str, Any],
     settings: Settings,
 ) -> Path | None:
-    """Download source file from Azure Blob to a temp file."""
+    """Download source file from GCS to a temp file."""
     blob_name = str(presentation_meta.get("source_blob_name") or "").strip()
     filename = str(presentation_meta.get("filename") or "source.bin").strip() or "source.bin"
     if not blob_name:

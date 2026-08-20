@@ -73,13 +73,9 @@ async def lifespan(app: FastAPI):
     agent_store.initialize()
     event_deduper.set_ttl_seconds(settings.webhook_dedupe_ttl_seconds)
     await configure_queue(settings.redis_url, settings.redis_key_prefix)
-    storage_mod.register_presentation(
-        "demo",
-        "demo-deck.pdf",
-        status="ready",
-        total_pages=20,
-        indexed_pages=20,
-    )
+    recovered = storage_mod.recover_catalog_from_gcs()
+    if recovered:
+        logger.info("Recovered %s presentation(s) from object storage", recovered)
     _worker_task = asyncio.create_task(transcript_worker_loop())
     if settings.session_cleanup_interval_seconds > 0:
         _cleanup_task = asyncio.create_task(

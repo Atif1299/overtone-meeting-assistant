@@ -4,6 +4,20 @@ All parts can live in **one GCP project** and **one region**. You get **three Cl
 
 ---
 
+## Secrets on Cloud Run
+
+Attach at least:
+
+- `OPENAI_API_KEY` (embeddings + OpenAI fallback)
+- `GEMINI_API_KEY` (Gemini Live + Vision when `REALTIME_PROVIDER` / `INDEXER_PROVIDER` are `auto` or `gemini`)
+- `RECALL_API_KEY`
+- `DATABASE_URL` (Cloud SQL)
+- `ADMIN_API_KEY`
+
+Optional env: `REALTIME_PROVIDER=auto`, `INDEXER_PROVIDER=auto`, `GEMINI_LIVE_MODEL`, `GEMINI_VISION_MODEL`, `GCS_BUCKET`.
+
+---
+
 ## Architecture (GCP only)
 
 | Service | Source | Dockerfile | Cloud Build config |

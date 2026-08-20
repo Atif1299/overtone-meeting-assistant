@@ -39,6 +39,7 @@ steps:
       - --timeout=3600
       - --cpu=1
       - --memory=1Gi
+      - --min-instances=1
 
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -565,24 +565,34 @@ class RealtimeToolExecutor:
 
         from services import storage as storage_mod
 
-        # 1. Load the source metadata (the gold standard for rich content)
-        all_meta = storage_mod.load_provided_metadata(sess.presentation_id)
-        if not all_meta or "pages" not in all_meta:
-            return {"ok": False, "error": "No rich metadata found for this presentation."}
-
-        # 2. Find the page (Helix format uses 1-indexed page_number or we can use index)
-        pages = all_meta.get("pages", [])
+        all_meta = storage_mod.load_provided_metadata(sess.presentation_id) or {}
+        pages = all_meta.get("pages") if isinstance(all_meta.get("pages"), list) else []
         page_data = next((p for p in pages if int(p.get("page_number", 0)) == page_number), None)
+        if not page_data and 0 < page_number <= len(pages):
+            page_data = pages[page_number - 1]
 
+        # Vision-indexed decks often land in index pages (content_text/searchable_content),
+        # not Helix-style provided_metadata with a flat "content" field.
         if not page_data:
-            # Fallback: if we can't find by explicit ID, try index if it's within bounds
-            if 0 < page_number <= len(pages):
-                page_data = pages[page_number - 1]
+            index_pages = storage_mod.load_index_pages(sess.presentation_id) or []
+            page_data = next(
+                (p for p in index_pages if int(p.get("page_number", 0)) == page_number),
+                None,
+            )
+            if not page_data and 0 < page_number <= len(index_pages):
+                page_data = index_pages[page_number - 1]
 
         if not page_data:
             return {"ok": False, "error": f"Page {page_number} not found."}
 
-        # 3. Assemble response with both the page's rich details and global context
+        slide_content = str(
+            page_data.get("searchable_content")
+            or page_data.get("content_text")
+            or page_data.get("content")
+            or page_data.get("description")
+            or ""
+        ).strip()
+
         rich_metadata = {
             "page_details": page_data,
             "presentation_context": {
@@ -590,14 +600,14 @@ class RealtimeToolExecutor:
                 "industry": all_meta.get("industry"),
                 "glossary": all_meta.get("glossary"),
                 "known_contradictions": all_meta.get("known_contradictions"),
-            }
+            },
         }
 
         return {
             "ok": True,
             "page_number": page_number,
             "title": page_data.get("title") or f"Page {page_number}",
-            "slide_content": str(page_data.get("content") or ""),
+            "slide_content": slide_content,
             "rich_metadata": rich_metadata,
         }
 

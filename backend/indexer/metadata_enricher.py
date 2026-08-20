@@ -1,4 +1,4 @@
-"""Claude Vision per-page metadata extraction for presentation slides."""
+"""Vision per-page metadata extraction for presentation slides (OpenAI or Gemini)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,8 @@ import json_repair
 
 logger = logging.getLogger(__name__)
 
-CLAUDE_MODEL = "claude-opus-4-5"
+VISION_MODEL = "gpt-4o"
+CLAUDE_MODEL = VISION_MODEL  # backward-compatible alias
 
 SLIDE_EXTRACTION_PROMPT = """You are a presentation slide analyzer. You are looking at slide {page_number} of {total_pages} from the file "{filename}".
 
@@ -106,7 +107,7 @@ def _read_image(path: str) -> str:
 
 
 def _parse_json_response(text: str, context: str = "") -> dict:
-    """Parse JSON from Claude response.
+    """Parse JSON from a Vision model response.
 
     Attempts in order:
     1. Direct parse after stripping code fences.
@@ -132,6 +133,15 @@ def _parse_json_response(text: str, context: str = "") -> dict:
     raise json.JSONDecodeError(f"Unable to parse JSON response{ctx}", text, 0)
 
 
+def _completion_text(response) -> str:
+    if getattr(response, "choices", None):
+        return str(response.choices[0].message.content or "")
+    content = getattr(response, "content", None)
+    if content:
+        return str(content[0].text)
+    return str(response)
+
+
 async def extract_slide_metadata(
     *,
     image_path: str,
@@ -139,9 +149,9 @@ async def extract_slide_metadata(
     total_pages: int,
     filename: str,
     client,
-    model: str = CLAUDE_MODEL,
+    model: str = VISION_MODEL,
 ) -> dict:
-    """Send one slide image to Claude Vision and return structured metadata dict."""
+    """Send one slide image to OpenAI Vision and return structured metadata dict."""
     image_data = await asyncio.to_thread(_read_image, image_path)
 
     prompt = SLIDE_EXTRACTION_PROMPT.format(
@@ -150,7 +160,7 @@ async def extract_slide_metadata(
         filename=filename,
     )
 
-    response = await client.messages.create(
+    response = await client.chat.completions.create(
         model=model,
         max_tokens=8192,
         messages=[
@@ -158,11 +168,9 @@ async def extract_slide_metadata(
                 "role": "user",
                 "content": [
                     {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/png",
-                            "data": image_data,
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image_data}",
                         },
                     },
                     {"type": "text", "text": prompt},
@@ -171,7 +179,7 @@ async def extract_slide_metadata(
         ],
     )
 
-    return _parse_json_response(response.content[0].text, f"page {page_number}")
+    return _parse_json_response(_completion_text(response), f"page {page_number}")
 
 
 async def extract_document_metadata(
@@ -179,7 +187,7 @@ async def extract_document_metadata(
     page_metadatas: list[dict],
     total_pages: int,
     client,
-    model: str = CLAUDE_MODEL,
+    model: str = VISION_MODEL,
 ) -> dict:
     """Generate document-level metadata from already-extracted per-page metadata."""
     slides_summary = "\n\n".join(
@@ -193,7 +201,7 @@ async def extract_document_metadata(
         total_pages=total_pages,
     )
 
-    response = await client.messages.create(
+    response = await client.chat.completions.create(
         model=model,
         max_tokens=2048,
         messages=[
@@ -201,7 +209,7 @@ async def extract_document_metadata(
         ],
     )
 
-    return _parse_json_response(response.content[0].text, "document metadata")
+    return _parse_json_response(_completion_text(response), "document metadata")
 
 
 async def extract_all_pages(
@@ -211,9 +219,9 @@ async def extract_all_pages(
     client,
     concurrency: int = 3,
     on_progress=None,
-    model: str = CLAUDE_MODEL,
+    model: str = VISION_MODEL,
 ) -> list[dict]:
-    """Extract metadata for all pages with a concurrency limit."""
+    """Extract metadata for all pages with a concurrency limit (OpenAI Vision)."""
     semaphore = asyncio.Semaphore(concurrency)
     results: list[dict | None] = [None] * len(page_images)
 
@@ -243,16 +251,155 @@ async def extract_all_pages(
                 except Exception as exc:  # noqa: BLE001
                     last_error = exc
                     if attempt < max_attempts:
-                        wait = 2 ** attempt  # 2 s, then 4 s
+                        wait = 2 ** attempt
                         logger.warning(
                             "Page %d Vision attempt %d/%d failed (%s) — retrying in %ds",
                             index + 1, attempt, max_attempts, exc, wait,
                         )
                         await asyncio.sleep(wait)
 
-            # All retries exhausted — insert stub so the rest of the job survives
             logger.error(
                 "Page %d Vision failed after %d attempts: %s — inserting stub entry",
+                index + 1, max_attempts, last_error,
+            )
+            results[index] = {
+                "page_number": index + 1,
+                "title": f"Slide {index + 1}",
+                "description": "",
+                "tag": "overview",
+                "speaker_notes": "",
+                "layout": "unknown",
+                "data_points": {},
+                "visuals": [],
+                "key_topics": [],
+                "entities": [],
+                "content_text": "",
+                "has_table": False,
+                "has_chart": False,
+                "has_diagram": False,
+                "searchable_content": "",
+                "questions_answered": [],
+                "_extraction_failed": True,
+            }
+
+    await asyncio.gather(*[process_page(i, p) for i, p in enumerate(page_images)])
+    return [r for r in results if r is not None]
+
+
+async def extract_slide_metadata_gemini(
+    *,
+    image_path: str,
+    page_number: int,
+    total_pages: int,
+    filename: str,
+    client,
+    model: str,
+) -> dict:
+    """Send one slide image to Gemini Vision and return structured metadata dict."""
+    from google.genai import types
+
+    image_bytes = await asyncio.to_thread(Path(image_path).read_bytes)
+    prompt = SLIDE_EXTRACTION_PROMPT.format(
+        page_number=page_number,
+        total_pages=total_pages,
+        filename=filename,
+    )
+    response = await client.aio.models.generate_content(
+        model=model,
+        contents=[
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
+                    types.Part.from_text(text=prompt),
+                ],
+            )
+        ],
+        config=types.GenerateContentConfig(max_output_tokens=8192),
+    )
+    text = getattr(response, "text", None) or ""
+    if not text and getattr(response, "candidates", None):
+        parts = response.candidates[0].content.parts or []
+        text = "".join(str(getattr(p, "text", "") or "") for p in parts)
+    return _parse_json_response(text, f"page {page_number}")
+
+
+async def extract_document_metadata_gemini(
+    *,
+    page_metadatas: list[dict],
+    total_pages: int,
+    client,
+    model: str,
+) -> dict:
+    """Generate document-level metadata via Gemini text model."""
+    from google.genai import types
+
+    slides_summary = "\n\n".join(
+        f"Slide {m.get('page_number', i+1)}: {m.get('title', '')} — {m.get('description', '')}\n"
+        f"Content: {(m.get('content_text') or m.get('searchable_content') or '')[:500]}"
+        for i, m in enumerate(page_metadatas)
+    )
+    prompt = DOCUMENT_METADATA_PROMPT.format(
+        slides_summary=slides_summary,
+        total_pages=total_pages,
+    )
+    response = await client.aio.models.generate_content(
+        model=model,
+        contents=prompt,
+        config=types.GenerateContentConfig(max_output_tokens=2048),
+    )
+    text = getattr(response, "text", None) or ""
+    return _parse_json_response(text, "document metadata")
+
+
+async def extract_all_pages_gemini(
+    *,
+    page_images: list[str],
+    filename: str,
+    client,
+    concurrency: int = 3,
+    on_progress=None,
+    model: str,
+) -> list[dict]:
+    """Extract metadata for all pages via Gemini Vision with a concurrency limit."""
+    semaphore = asyncio.Semaphore(concurrency)
+    results: list[dict | None] = [None] * len(page_images)
+
+    async def process_page(index: int, image_path: str) -> None:
+        async with semaphore:
+            max_attempts = 3
+            last_error: Exception | None = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    metadata = await extract_slide_metadata_gemini(
+                        image_path=image_path,
+                        page_number=index + 1,
+                        total_pages=len(page_images),
+                        filename=filename,
+                        client=client,
+                        model=model,
+                    )
+                    results[index] = metadata
+                    logger.info("Gemini Vision extracted page %d/%d", index + 1, len(page_images))
+                    if on_progress:
+                        await on_progress(
+                            phase="enriching",
+                            progress=(index + 1) / len(page_images),
+                            current_page=index + 1,
+                        )
+                    return
+                except Exception as exc:  # noqa: BLE001
+                    last_error = exc
+                    if attempt < max_attempts:
+                        wait = 2 ** attempt
+                        logger.warning(
+                            "Page %d Gemini Vision attempt %d/%d failed (%s) — retrying in %ds",
+                            index + 1, attempt, max_attempts, exc, wait,
+                        )
+                        await asyncio.sleep(wait)
+
+            logger.error(
+                "Page %d Gemini Vision failed after %d attempts: %s — inserting stub entry",
                 index + 1, max_attempts, last_error,
             )
             results[index] = {

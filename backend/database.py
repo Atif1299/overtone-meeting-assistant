@@ -36,4 +36,9 @@ def get_db() -> Session:
 def create_tables():
     from models.bot_session import BotSession  # noqa
     from models.api_key import ApiKey  # noqa
+    from models.presentation_record import PresentationRecord  # noqa
     Base.metadata.create_all(bind=engine)
+    if "postgres" in DATABASE_URL.lower():
+        from indexer.search_indexer import _ensure_index_exists_sync
+
+        _ensure_index_exists_sync()

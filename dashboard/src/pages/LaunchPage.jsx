@@ -27,7 +27,7 @@ export default function LaunchPage() {
       try {
         const data = await apiGet("/api/v1/presentations");
         if (cancelled) return;
-        const list = Array.isArray(data) ? data : [];
+        const list = (Array.isArray(data) ? data : []).filter((item) => item.status === "ready");
         setPresentations(list);
         setPresentationsError("");
         if (

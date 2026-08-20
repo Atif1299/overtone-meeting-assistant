@@ -12,6 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+os.environ["DATABASE_URL"] = ""
+os.environ["GCS_BUCKET"] = ""
+os.environ["ANTHROPIC_API_KEY"] = ""
+
 
 @pytest.fixture(scope="session")
 def client() -> TestClient:
@@ -24,6 +28,7 @@ def client() -> TestClient:
     os.environ["VOICENAV_DEV"] = "0"
     os.environ["AGENTS_DB_PATH"] = str(test_agents_db)
     os.environ["ANTHROPIC_API_KEY"] = ""
+    os.environ["GCS_BUCKET"] = ""
     os.environ["AZURE_BLOB_ACCOUNT_URL"] = ""
     os.environ["AZURE_BLOB_ACCOUNT_KEY"] = ""
 

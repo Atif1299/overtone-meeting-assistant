@@ -42,7 +42,7 @@ def test_slide_image_endpoint_reads_from_blob_when_available(
         FakeBlobStorageClient,
     )
 
-    response = client.get(f"/api/presentations/{uploaded.presentation_id}/page/1/image")
+    response = client.get(f"/api/v1/presentations/{uploaded.presentation_id}/page/1/image")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("image/png")
     assert response.content.startswith(b"\x89PNG")
