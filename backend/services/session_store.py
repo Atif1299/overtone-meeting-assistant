@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+import json
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
+from enum import Enum
 from typing import Any
 
 from models.bot_session import AgentMode, BotSession, BotSessionState
@@ -64,8 +66,12 @@ class SessionStore:
                     await redis.srem(self._redis_sessions_set_key(), session_id)
                     continue
                 try:
-                    session = BotSession.model_validate_json(raw)
+                    session = session_from_redis_dict(json.loads(raw) if isinstance(raw, str) else raw)
                 except Exception:
+                    await redis.delete(self._redis_session_key(session_id))
+                    await redis.srem(self._redis_sessions_set_key(), session_id)
+                    continue
+                if session is None:
                     await redis.delete(self._redis_session_key(session_id))
                     await redis.srem(self._redis_sessions_set_key(), session_id)
                     continue
@@ -73,11 +79,15 @@ class SessionStore:
                     await redis.delete(self._redis_session_key(session_id))
                     if session.bot_id:
                         await redis.delete(self._redis_bot_key(session.bot_id))
+                    if getattr(session, "recall_bot_id", None):
+                        await redis.delete(self._redis_bot_key(session.recall_bot_id))
                     await redis.srem(self._redis_sessions_set_key(), session_id)
                     continue
                 self._by_session[session_id] = session
                 if session.bot_id:
                     self._bot_to_session[session.bot_id] = session_id
+                if getattr(session, "recall_bot_id", None):
+                    self._bot_to_session[session.recall_bot_id] = session_id
                 loaded += 1
         return loaded
 
@@ -297,10 +307,14 @@ class SessionStore:
             return
         ttl_seconds = _ttl_seconds_for_session(session)
         kwargs = {"ex": ttl_seconds} if ttl_seconds is not None else {}
-        await redis.set(self._redis_session_key(session.session_id), session.model_dump_json(), **kwargs)
+        payload = json.dumps(session_to_redis_dict(session))
+        await redis.set(self._redis_session_key(session.session_id), payload, **kwargs)
         await redis.sadd(self._redis_sessions_set_key(), session.session_id)
         if session.bot_id:
             await redis.set(self._redis_bot_key(session.bot_id), session.session_id, **kwargs)
+        recall_id = getattr(session, "recall_bot_id", None)
+        if recall_id:
+            await redis.set(self._redis_bot_key(str(recall_id)), session.session_id, **kwargs)
 
     async def _restore_session_from_redis(self, session_id: str) -> BotSession | None:
         redis = await self._get_redis()
@@ -310,7 +324,8 @@ class SessionStore:
         if not raw:
             return None
         try:
-            return BotSession.model_validate_json(raw)
+            data = json.loads(raw) if isinstance(raw, str) else raw
+            return session_from_redis_dict(data)
         except Exception:
             await redis.delete(self._redis_session_key(session_id))
             await redis.srem(self._redis_sessions_set_key(), session_id)
@@ -363,6 +378,99 @@ def _map_recall_status(code: str | None) -> BotSessionState:
         "ready": BotSessionState.UNKNOWN,
     }
     return mapping.get(code, BotSessionState.UNKNOWN)
+
+
+def _enum_or_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, Enum):
+        return str(value.value)
+    return str(value)
+
+
+def _dt_to_iso(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat()
+    return str(value)
+
+
+def _dt_from_iso(value: Any) -> datetime | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value
+    text = str(value).replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def session_to_redis_dict(sess: BotSession) -> dict[str, Any]:
+    """Serialize a BotSession for Redis without relying on Pydantic."""
+    return {
+        "session_id": sess.session_id,
+        "customer_id": sess.customer_id,
+        "bot_id": sess.bot_id,
+        "presentation_id": sess.presentation_id,
+        "bot_name": sess.bot_name,
+        "meeting_url": sess.meeting_url,
+        "agent_mode": _enum_or_str(sess.agent_mode) or AgentMode.REALTIME.value,
+        "agent_name": sess.agent_name,
+        "agent_version": sess.agent_version,
+        "state": _enum_or_str(sess.state) or BotSessionState.CREATED.value,
+        "last_status_code": sess.last_status_code,
+        "last_status_message": sess.last_status_message,
+        "last_transcript_snippet": sess.last_transcript_snippet,
+        "created_at": _dt_to_iso(sess.created_at),
+        "updated_at": _dt_to_iso(sess.updated_at),
+        "expires_at": _dt_to_iso(sess.expires_at),
+        "extra": dict(sess.extra or {}) if sess.extra is not None else {},
+        "pdf_url": sess.pdf_url,
+        "metadata_url": sess.metadata_url,
+        "recall_bot_id": sess.recall_bot_id,
+    }
+
+
+def session_from_redis_dict(data: dict[str, Any] | None) -> BotSession | None:
+    """Rebuild a BotSession from Redis JSON."""
+    if not data or not isinstance(data, dict):
+        return None
+    session_id = data.get("session_id")
+    if not session_id:
+        return None
+    agent_mode = data.get("agent_mode") or AgentMode.REALTIME.value
+    state = data.get("state") or BotSessionState.CREATED.value
+    if isinstance(agent_mode, AgentMode):
+        agent_mode = agent_mode.value
+    if isinstance(state, BotSessionState):
+        state = state.value
+    return BotSession(
+        session_id=str(session_id),
+        customer_id=data.get("customer_id"),
+        bot_id=data.get("bot_id"),
+        presentation_id=data.get("presentation_id"),
+        bot_name=data.get("bot_name"),
+        meeting_url=data.get("meeting_url"),
+        agent_mode=str(agent_mode),
+        agent_name=data.get("agent_name") or "default",
+        agent_version=data.get("agent_version"),
+        state=str(state),
+        last_status_code=data.get("last_status_code"),
+        last_status_message=data.get("last_status_message"),
+        last_transcript_snippet=data.get("last_transcript_snippet"),
+        created_at=_dt_from_iso(data.get("created_at")) or _now_utc(),
+        updated_at=_dt_from_iso(data.get("updated_at")) or _now_utc(),
+        expires_at=_dt_from_iso(data.get("expires_at")),
+        extra=dict(data.get("extra") or {}),
+        pdf_url=data.get("pdf_url"),
+        metadata_url=data.get("metadata_url"),
+        recall_bot_id=data.get("recall_bot_id"),
+    )
 
 
 def _now_utc() -> datetime:

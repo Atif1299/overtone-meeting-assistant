@@ -43,6 +43,110 @@ async def _get_session(session_id: str):
         logger.warning("DB session fallback failed session_id=%s: %s", session_id, exc)
         return None
 
+
+def _page_text_candidates(page: dict | None) -> list[str]:
+    if not isinstance(page, dict):
+        return []
+    values = []
+    for key in ("searchable_content", "content_text", "content", "description", "title"):
+        text = str(page.get(key) or "").strip()
+        if text:
+            values.append(text)
+    return values
+
+
+def _richest_slide_text(*pages: dict | None) -> str:
+    best = ""
+    for page in pages:
+        for text in _page_text_candidates(page):
+            if len(text) > len(best):
+                best = text
+    return best.strip()
+
+
+def _richest_page_dict(*pages: dict | None) -> dict:
+    """Prefer the page dict that carries the richest non-stub body text."""
+    best: dict = {}
+    best_len = -1
+    for page in pages:
+        if not isinstance(page, dict):
+            continue
+        text = _richest_slide_text(page)
+        if len(text) > best_len:
+            best = page
+            best_len = len(text)
+    return best
+
+
+def _query_terms(query: str) -> list[str]:
+    stop = {
+        "a", "an", "the", "this", "that", "these", "those", "is", "are", "was", "were",
+        "what", "whats", "about", "on", "of", "for", "to", "and", "or", "please",
+        "tell", "me", "more", "explain", "bit", "slide", "page",
+    }
+    terms = []
+    for raw in (query or "").lower().replace("-", " ").split():
+        token = "".join(ch for ch in raw if ch.isalnum())
+        if len(token) < 3 or token in stop:
+            continue
+        if token not in terms:
+            terms.append(token)
+    return terms
+
+
+async def _current_page_match(
+    *,
+    presentation_id: str,
+    page_number: int,
+    query: str,
+) -> dict[str, Any] | None:
+    """Return current-page content when query terms appear on the visible slide."""
+    from services import storage as storage_mod
+
+    all_meta = storage_mod.load_provided_metadata(presentation_id) or {}
+    pages = all_meta.get("pages") if isinstance(all_meta.get("pages"), list) else []
+    provided_page = next((p for p in pages if int(p.get("page_number", 0)) == page_number), None)
+    if not provided_page and 0 < page_number <= len(pages):
+        provided_page = pages[page_number - 1]
+
+    index_pages = storage_mod.load_index_pages(presentation_id) or []
+    index_page = next(
+        (p for p in index_pages if int(p.get("page_number", 0)) == page_number),
+        None,
+    )
+    if not index_page and 0 < page_number <= len(index_pages):
+        index_page = index_pages[page_number - 1]
+
+    page_data = _richest_page_dict(provided_page, index_page)
+    slide_content = _richest_slide_text(provided_page, index_page)
+    if not slide_content:
+        return None
+
+    haystack = slide_content.lower()
+    terms = _query_terms(query)
+    if not terms:
+        return None
+    hits = sum(1 for term in terms if term in haystack)
+    # Match if any meaningful term hits, or majority for multi-term queries.
+    if hits == 0:
+        return None
+    if len(terms) >= 2 and hits < max(1, (len(terms) + 1) // 2):
+        return None
+
+    return {
+        "slide_content": slide_content,
+        "rich_metadata": {
+            "page_details": page_data,
+            "presentation_context": {
+                "account": all_meta.get("account_name"),
+                "industry": all_meta.get("industry"),
+                "glossary": all_meta.get("glossary"),
+                "known_contradictions": all_meta.get("known_contradictions"),
+            },
+        },
+    }
+
+
 REALTIME_TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
@@ -178,19 +282,21 @@ REALTIME_TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "name": "get_slide_details",
         "description": (
-            "Retrieve the full rich structured metadata for a SPECIFIC page number. "
-            "Use this if you or the user identifies a specific slide (e.g., 'Look at page 3', 'What is on the next slide?'). "
-            "Returns structured metrics, visual descriptions, and specific grounding data for that page."
+            "Retrieve full metadata and text for a slide. "
+            "Use for 'explain this', 'explain this slide', 'what's on this slide', "
+            "'explain this chart/graph', or when narrating the currently visible slide. "
+            "Omit page_number to use the session's current page. "
+            "Returns slide_content and rich_metadata — narrate from those only."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "page_number": {
                     "type": "integer",
-                    "description": "The 1-indexed page number to retrieve.",
+                    "description": "Optional 1-indexed page. Defaults to the currently visible page.",
                 }
             },
-            "required": ["page_number"],
+            "required": [],
         },
     },
     {
@@ -344,6 +450,10 @@ class RealtimeToolExecutor:
             },
         )
 
+        # Persist visible page so explain/get_slide_details default correctly.
+        sess.extra = {**(sess.extra or {}), "current_page": target_page}
+        await store.merge_extra(session_id, current_page=target_page)
+
         # 1. Load slide content (for natural narration)
         slide_content = ""
         slide_title = ""
@@ -446,7 +556,37 @@ class RealtimeToolExecutor:
         top_slide = slide_hits[0] if (slide_hits and slide_hits[0].get("score", 0) > 0.7) else None
         top_brief = brief_hits[0] if (brief_hits and brief_hits[0].get("score", 0) > 0.5) else None
 
+        current_page = int((sess.extra or {}).get("current_page") or 1)
+
         if not top_slide and not top_brief:
+            # Before external search: if the visible slide already mentions the query, use it.
+            on_page = await _current_page_match(
+                presentation_id=sess.presentation_id,
+                page_number=current_page,
+                query=search_query or user_question,
+            )
+            if on_page:
+                logger.info(
+                    "Hybrid search: current page %s matches query — staying on slide session_id=%s",
+                    current_page,
+                    session_id,
+                )
+                return {
+                    "ok": True,
+                    "target_page": current_page,
+                    "page_number": current_page,
+                    "navigated": False,
+                    "slide_content": on_page["slide_content"],
+                    "brief_content": "",
+                    "rich_metadata": on_page.get("rich_metadata") or {},
+                    "instruction": (
+                        "The currently visible slide already covers this topic. "
+                        "Answer from slide_content only. Do NOT call fetch_external_data. "
+                        "Do NOT say the information is missing from the slide. "
+                        "Respond in 2-3 short natural sentences."
+                    ),
+                    "total_ms": (time.monotonic() - t_start) * 1000,
+                }
             # Priority 3: External Data Fallback
             logger.info("Hybrid search: NO HITS. Triggering Tier 3 (External Data) session_id=%s", session_id)
             return {
@@ -458,7 +598,6 @@ class RealtimeToolExecutor:
             }
 
         # 1. Prepare Slide Content if any
-        current_page = int(sess.extra.get("current_page") or 1)
         res_navigated = False
         res_target_page = current_page
         slide_info = ""
@@ -494,7 +633,8 @@ class RealtimeToolExecutor:
                         },
                     )
                     # Persist current page in session
-                    sess.extra["current_page"] = res_target_page
+                    sess.extra = {**(sess.extra or {}), "current_page": res_target_page}
+                    await store.merge_extra(session_id, current_page=res_target_page)
                 except Exception as e:
                     logger.warning("Failed to broadcast navigation sync: %s", e)
             else:
@@ -541,6 +681,7 @@ class RealtimeToolExecutor:
         return {
             "ok": True,
             "target_page": res_target_page,
+            "page_number": res_target_page,
             "navigated": res_navigated,
             "slide_content": slide_info,
             "brief_content": brief_info,
@@ -561,37 +702,32 @@ class RealtimeToolExecutor:
         if not sess:
             raise ValueError("Session not found")
 
-        page_number = int(args.get("page_number") or 1)
+        extra = sess.extra if isinstance(getattr(sess, "extra", None), dict) else {}
+        current_page = int(extra.get("current_page") or 1)
+        raw_page = args.get("page_number")
+        page_number = int(raw_page) if raw_page is not None else current_page
 
         from services import storage as storage_mod
 
         all_meta = storage_mod.load_provided_metadata(sess.presentation_id) or {}
         pages = all_meta.get("pages") if isinstance(all_meta.get("pages"), list) else []
-        page_data = next((p for p in pages if int(p.get("page_number", 0)) == page_number), None)
-        if not page_data and 0 < page_number <= len(pages):
-            page_data = pages[page_number - 1]
+        provided_page = next((p for p in pages if int(p.get("page_number", 0)) == page_number), None)
+        if not provided_page and 0 < page_number <= len(pages):
+            provided_page = pages[page_number - 1]
 
-        # Vision-indexed decks often land in index pages (content_text/searchable_content),
-        # not Helix-style provided_metadata with a flat "content" field.
-        if not page_data:
-            index_pages = storage_mod.load_index_pages(sess.presentation_id) or []
-            page_data = next(
-                (p for p in index_pages if int(p.get("page_number", 0)) == page_number),
-                None,
-            )
-            if not page_data and 0 < page_number <= len(index_pages):
-                page_data = index_pages[page_number - 1]
+        index_pages = storage_mod.load_index_pages(sess.presentation_id) or []
+        index_page = next(
+            (p for p in index_pages if int(p.get("page_number", 0)) == page_number),
+            None,
+        )
+        if not index_page and 0 < page_number <= len(index_pages):
+            index_page = index_pages[page_number - 1]
 
-        if not page_data:
+        if not provided_page and not index_page:
             return {"ok": False, "error": f"Page {page_number} not found."}
 
-        slide_content = str(
-            page_data.get("searchable_content")
-            or page_data.get("content_text")
-            or page_data.get("content")
-            or page_data.get("description")
-            or ""
-        ).strip()
+        page_data = _richest_page_dict(provided_page, index_page)
+        slide_content = _richest_slide_text(provided_page, index_page)
 
         rich_metadata = {
             "page_details": page_data,
@@ -609,6 +745,11 @@ class RealtimeToolExecutor:
             "title": page_data.get("title") or f"Page {page_number}",
             "slide_content": slide_content,
             "rich_metadata": rich_metadata,
+            "instruction": (
+                "Narrate 2-4 sentences about this visible slide using slide_content and rich_metadata. "
+                "Do NOT ask what to explain. Do NOT say the content is missing. "
+                "Do NOT call fetch_external_data."
+            ),
         }
 
     async def _send_chat_message(self, *, session_id: str, args: dict[str, Any]) -> dict[str, Any]:

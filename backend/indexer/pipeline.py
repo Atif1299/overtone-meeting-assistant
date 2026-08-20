@@ -163,6 +163,30 @@ async def run_index_job(presentation_id: str) -> None:
 
     total_pages = len(page_metadata_list)
 
+    stub_count = sum(1 for entry in page_metadata_list if _is_stub_page_entry(entry))
+    stub_ratio = stub_count / total_pages if total_pages else 1.0
+    if total_pages >= 3 and stub_ratio > 0.2:
+        logger.error(
+            "[%s] Index quality gate failed: %d/%d pages are empty Vision stubs",
+            presentation_id,
+            stub_count,
+            total_pages,
+        )
+        _save_local_index(presentation_id, [])
+        storage_mod.update_presentation_meta(
+            presentation_id,
+            status="failed",
+            index_error=(
+                f"Vision extraction produced empty stub content for {stub_count}/{total_pages} pages. "
+                "Re-run indexing with a working GEMINI_VISION_MODEL (e.g. gemini-2.5-flash)."
+            ),
+            indexed_pages=0,
+            total_pages=total_pages,
+            metadata_provider=metadata_provider,
+            metadata_model=metadata_model,
+        )
+        return
+
     # Save pages + chunks locally for RAG keyword fallback
     _save_local_index(presentation_id, page_metadata_list)
 
@@ -215,6 +239,33 @@ async def run_index_job(presentation_id: str) -> None:
             )
         except Exception as exc:
             logger.error("[%s] Briefing indexing failed (non-fatal): %s", presentation_id, exc)
+
+
+def _is_stub_page_entry(entry: dict) -> bool:
+    """True when page text is empty or title-only Vision failure stub."""
+    if entry.get("_extraction_failed"):
+        return True
+    page_num = entry.get("page_number")
+    title = str(entry.get("title") or "").strip()
+    searchable = str(entry.get("searchable_content") or "").strip()
+    content = str(entry.get("content_text") or "").strip()
+    body = searchable or content
+    if not body:
+        return True
+    stub_labels = {
+        f"Slide {page_num}",
+        f"Page {page_num}",
+        f"Slide {page_num}.",
+        f"Page {page_num}.",
+    }
+    normalized = " ".join(body.replace("\n", " ").split())
+    if normalized in stub_labels:
+        return True
+    if title in stub_labels and normalized == title:
+        return True
+    if title in stub_labels and len(normalized) <= len(title) + 2:
+        return True
+    return False
 
 
 def _build_page_metadata_entry(p_data: dict, blob_urls: dict) -> dict | None:
@@ -351,7 +402,7 @@ async def _run_gemini_vision_pipeline(
         raise RuntimeError("GEMINI_API_KEY is not configured for Vision indexing")
     from google import genai
 
-    vision_model = settings.gemini_vision_model or "gemini-2.0-flash"
+    vision_model = settings.gemini_vision_model or "gemini-2.5-flash"
     client = genai.Client(api_key=settings.gemini_api_key)
     logger.info("[%s] Using Gemini Vision model=%s", presentation_id, vision_model)
 
@@ -402,6 +453,10 @@ async def _upload_to_search(
     settings: Settings,
 ) -> int:
     """Generate embeddings and upload to pgvector."""
+    if not (settings.openai_api_key or "").strip():
+        raise RuntimeError(
+            "OPENAI_API_KEY required for embeddings when DATABASE_URL is set"
+        )
     openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     async def generate_embedding(text: str) -> list[float]:

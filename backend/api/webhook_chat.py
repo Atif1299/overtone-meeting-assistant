@@ -136,8 +136,10 @@ async def recall_chat_webhook(
     if not text:
         return {"status": "ignored", "reason": "empty text"}
 
-    # Look up session
+    # Look up session (memory first, then SQL by recall_bot_id / bot_id)
     sess = await store.get_by_bot_id(bot_id)
+    if not sess:
+        sess = await _load_session_from_db_by_bot_id(bot_id)
     if not sess:
         logger.warning("Chat webhook: no session for bot_id=%s", bot_id)
         return {"status": "ignored", "reason": "session not found"}
@@ -224,3 +226,34 @@ async def recall_chat_webhook(
         sess.session_id, sender,
     )
     return {"status": "ok"}
+
+
+async def _load_session_from_db_by_bot_id(bot_id: str):
+    """Fall back to SQL BotSession when in-memory map misses (e.g. after restart)."""
+    try:
+        from database import SessionLocal
+        from models.bot_session import BotSession as BotSessionModel
+
+        db = SessionLocal()
+        try:
+            row = (
+                db.query(BotSessionModel)
+                .filter(
+                    (BotSessionModel.recall_bot_id == bot_id)
+                    | (BotSessionModel.bot_id == bot_id)
+                )
+                .order_by(BotSessionModel.updated_at.desc())
+                .first()
+            )
+            if not row:
+                return None
+            await store.register_session(row)
+            if row.recall_bot_id and row.recall_bot_id != row.bot_id:
+                # Ensure chat lookup by Recall id works even if bot_id differed historically.
+                await store.attach_bot_id(row.session_id, row.recall_bot_id)
+            return row
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("Chat webhook DB fallback failed bot_id=%s: %s", bot_id, exc)
+        return None

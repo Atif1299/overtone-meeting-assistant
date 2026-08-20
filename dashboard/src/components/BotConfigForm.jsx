@@ -12,14 +12,18 @@ export default function BotConfigForm({
   const selectedPresentation = readyPresentations.find(
     (presentation) => presentation.presentation_id === value.presentation_id
   );
+  const readyIds = new Set(readyPresentations.map((p) => p.presentation_id));
+  const canConnect =
+    Boolean(value.presentation_id) && readyIds.has(value.presentation_id) && !disabled;
 
   function handleAgentChange(nextAgentName) {
     const nextAgent = agents.find((agent) => agent.agent_name === nextAgentName);
-    const nextPresentation = nextAgent?.active_presentation_id || value.presentation_id;
+    const candidate = nextAgent?.active_presentation_id || "";
+    const nextPresentation = readyIds.has(candidate) ? candidate : "";
     onChange({
       ...value,
       agent_name: nextAgentName,
-      presentation_id: nextPresentation || value.presentation_id,
+      presentation_id: nextPresentation,
     });
   }
 
@@ -27,6 +31,7 @@ export default function BotConfigForm({
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        if (!canConnect) return;
         onSubmit();
       }}
       className="stack-gap"
@@ -92,6 +97,7 @@ export default function BotConfigForm({
             <select
               className="input"
               value={value.presentation_id || ""}
+              required
               onChange={(e) => onChange({ ...value, presentation_id: e.target.value })}
             >
               <option value="" disabled>
@@ -104,12 +110,9 @@ export default function BotConfigForm({
               ))}
             </select>
           ) : (
-            <input
-              className="input"
-              value={value.presentation_id || ""}
-              required
-              onChange={(e) => onChange({ ...value, presentation_id: e.target.value })}
-            />
+            <div className="helper-text" role="status">
+              Upload and wait until ready. No ready presentations available yet.
+            </div>
           )}
         </label>
       </div>
@@ -153,7 +156,7 @@ export default function BotConfigForm({
           Bot will auto-narrate slides 1–{value.auto_present_pages}, then switch to Q&A mode.
         </div>
       )}
-      <button type="submit" disabled={disabled} className="button button-primary">
+      <button type="submit" disabled={!canConnect} className="button button-primary">
         {disabled ? "Launching..." : "Connect bot"}
       </button>
     </form>

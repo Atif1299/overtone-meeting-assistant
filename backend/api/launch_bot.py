@@ -9,8 +9,9 @@ from pydantic import BaseModel, Field, HttpUrl
 
 from api.auth import require_customer_key
 from config import Settings, get_settings
+from database import SessionLocal
 from indexer.pipeline import run_index_job
-from models.bot_session import AgentMode
+from models.bot_session import AgentMode, BotSession, BotSessionState
 from services.agent_store import DEFAULT_AGENT_NAME, agent_store
 from services.recall_client import RecallClient
 from services.session_store import store
@@ -148,6 +149,7 @@ async def launch_bot(
             output_url = f"{output_url}&wss={quote(relay_wss, safe='')}"
 
     webhook_url = f"{be}/api/webhook/recall/transcript"
+    chat_webhook_url = f"{be}/api/webhook/recall/chat"
 
     client = _recall_client(settings)
     payload = client.build_create_bot_payload(
@@ -155,6 +157,7 @@ async def launch_bot(
         bot_name=body.bot_name,
         output_media_page_url=output_url,
         transcript_webhook_url=webhook_url,
+        chat_webhook_url=chat_webhook_url,
         enable_transcript_webhook=agent_mode == AgentMode.WEBHOOK,
     )
 
@@ -163,33 +166,62 @@ async def launch_bot(
     except Exception as e:
         raise HTTPException(502, f"Recall.ai Create Bot failed: {e}") from e
 
-    bot_id = created.get("id") or created.get("bot_id")
-    if not bot_id:
+    recall_bot_id = created.get("id") or created.get("bot_id")
+    if not recall_bot_id:
         raise HTTPException(502, f"Unexpected Recall response: {created!r}")
+    recall_bot_id = str(recall_bot_id)
 
-    await store.create_session(
+    extra = {
+        "relay_status": "idle" if agent_mode == AgentMode.REALTIME else "disabled",
+        "fallback_active": agent_mode == AgentMode.WEBHOOK,
+        "realtime_errors": 0,
+        "relay_profile": relay_profile,
+        "agent_system_prompt": active_agent.system_prompt,
+        "agent_presentation_id": active_agent.presentation_id,
+        "auto_present_pages": body.auto_present_pages or 0,
+    }
+
+    # Durable SQL row so presenter/realtime WS can recover after process restart.
+    db = SessionLocal()
+    try:
+        db_sess = BotSession(
+            session_id=session_id,
+            bot_id=recall_bot_id,
+            recall_bot_id=recall_bot_id,
+            presentation_id=resolved_presentation_id,
+            bot_name=body.bot_name,
+            meeting_url=str(body.meeting_url),
+            agent_mode=agent_mode.value if isinstance(agent_mode, AgentMode) else str(agent_mode),
+            agent_name=active_agent.agent_name,
+            agent_version=active_agent.version_number,
+            state=BotSessionState.JOINING.value,
+            extra=extra,
+        )
+        db.merge(db_sess)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    in_mem = await store.create_session(
         presentation_id=resolved_presentation_id,
         bot_name=body.bot_name,
         meeting_url=str(body.meeting_url),
         agent_mode=agent_mode,
         agent_name=active_agent.agent_name,
         agent_version=active_agent.version_number,
-        bot_id=str(bot_id),
+        bot_id=recall_bot_id,
         session_id=session_id,
-        extra={
-            "relay_status": "idle" if agent_mode == AgentMode.REALTIME else "disabled",
-            "fallback_active": agent_mode == AgentMode.WEBHOOK,
-            "realtime_errors": 0,
-            "relay_profile": relay_profile,
-            "agent_system_prompt": active_agent.system_prompt,
-            "agent_presentation_id": active_agent.presentation_id,
-            "auto_present_pages": body.auto_present_pages or 0,
-        },
+        extra=extra,
     )
+    in_mem.recall_bot_id = recall_bot_id
+    await store._persist_session(in_mem)
 
     return LaunchBotResponse(
         session_id=session_id,
-        bot_id=str(bot_id),
+        bot_id=recall_bot_id,
         presentation_id=resolved_presentation_id,
         agent_mode=agent_mode,
         agent_name=active_agent.agent_name,

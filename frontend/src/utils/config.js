@@ -1,3 +1,5 @@
+import { resolveWsBase } from "./resolveWsBase.js";
+
 function queryValue(name) {
   if (typeof window === "undefined") return "";
   try {
@@ -20,43 +22,21 @@ function deriveHttpBaseFromWss() {
   }
 }
 
-function wsBase() {
-  const u = import.meta.env.VITE_WS_BASE || "";
-  if (u && !u.includes("REPLACE-WITH")) return u.replace(/\/$/, "");
-  // If a ?wss= param is provided, use it directly.
-  const relay = queryValue("wss");
-  if (relay) {
-    try {
-      const url = new URL(relay);
-      const proto = url.protocol === "https:" ? "wss:" : url.protocol;
-      return `${proto}//${url.host}`;
-    } catch {
-      // Fall through.
-    }
-  }
-  // If a ?api= param is provided, convert https→wss and use that host.
-  // This ensures the WebSocket connects to the backend tunnel, not the frontend tunnel.
-  const apiParam = queryValue("api");
-  if (apiParam) {
-    try {
-      const url = new URL(apiParam);
-      const proto = url.protocol === "https:" ? "wss:" : "ws:";
-      return `${proto}//${url.host}`;
-    } catch {
-      // Fall through.
-    }
-  }
-  if (typeof window !== "undefined") {
-    const { protocol, hostname } = window.location;
-    const wsProto = protocol === "https:" ? "wss:" : "ws:";
-    const port = import.meta.env.VITE_BACKEND_PORT || "8000";
-    // On localhost, append the port. On tunnels (ngrok/cloudflare), use standard port (no suffix).
-    if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
-      return `${wsProto}//${hostname}`;
-    }
-    return `${wsProto}//127.0.0.1:${port}`;
-  }
-  return "ws://127.0.0.1:8000";
+export { resolveWsBase };
+
+export function wsBase() {
+  const locationHostname =
+    typeof window !== "undefined" ? window.location.hostname : "";
+  const locationProtocol =
+    typeof window !== "undefined" ? window.location.protocol : "http:";
+  return resolveWsBase({
+    wssQuery: queryValue("wss"),
+    viteWsBase: import.meta.env.VITE_WS_BASE || "",
+    apiQuery: queryValue("api"),
+    locationHostname,
+    locationProtocol,
+    backendPort: import.meta.env.VITE_BACKEND_PORT || "8000",
+  });
 }
 
 export function presentationWsUrl(sessionId) {

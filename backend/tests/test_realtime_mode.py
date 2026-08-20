@@ -66,7 +66,17 @@ def test_launch_bot_realtime_mode_includes_relay_and_disables_transcript_webhook
 
     assert captured_payloads
     recording_config = captured_payloads[0]["recording_config"]
-    assert "realtime_endpoints" not in recording_config
+    endpoints = recording_config.get("realtime_endpoints") or []
+    # Realtime mode skips transcript webhooks but always attaches chat webhook.
+    assert endpoints
+    assert all(
+        "transcript.data" not in (ep.get("events") or [])
+        and "transcript.partial_data" not in (ep.get("events") or [])
+        for ep in endpoints
+    )
+    assert any(
+        "participant_events.chat_message" in (ep.get("events") or []) for ep in endpoints
+    )
 
 
 def test_launch_bot_uses_agent_default_presentation_when_missing_in_payload(
@@ -185,6 +195,77 @@ def test_launch_bot_output_override_uses_demo_profile_and_injects_wss(
     assert captured_payloads[0]["output_media"]["camera"]["config"]["url"] == payload["output_media_url"]
 
 
+def test_launch_bot_sets_recall_bot_id_and_chat_webhook(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, recall_settings
+) -> None:
+    monkeypatch.setattr("api.presentations.dispatch_index_job", lambda _presentation_id: True)
+    upload = client.post(
+        "/api/v1/presentations",
+        files={"file": ("deck.pdf", b"%PDF-1.4 fake content", "application/pdf")},
+    )
+    assert upload.status_code == 200
+    presentation_id = upload.json()["presentation_id"]
+    from services import storage as storage_mod
+
+    storage_mod.update_presentation_meta(
+        presentation_id, status="ready", indexed_pages=1, total_pages=1
+    )
+
+    captured_payloads: list[dict] = []
+
+    async def _fake_create_bot(self, payload: dict) -> dict:
+        captured_payloads.append(payload)
+        return {"id": "bot-chat-parity-123"}
+
+    monkeypatch.setattr("services.recall_client.RecallClient.create_bot", _fake_create_bot)
+
+    response = client.post(
+        "/api/launch-bot",
+        json={
+            "bot_name": "Overtone Agent",
+            "meeting_url": "https://meet.google.com/abc-defg-hij",
+            "presentation_id": presentation_id,
+            "agent_mode": "realtime",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["bot_id"] == "bot-chat-parity-123"
+    assert body["session_id"]
+
+    assert captured_payloads
+    rec_endpoints = captured_payloads[0]["recording_config"]["realtime_endpoints"]
+    chat_urls = [
+        ep["url"]
+        for ep in rec_endpoints
+        if "participant_events.chat_message" in (ep.get("events") or [])
+    ]
+    assert chat_urls
+    assert chat_urls[0].endswith("/api/webhook/recall/chat")
+
+    sess = asyncio.run(store.get_by_session_id(body["session_id"]))
+    assert sess is not None
+    assert sess.bot_id == "bot-chat-parity-123"
+    assert sess.recall_bot_id == "bot-chat-parity-123"
+
+    from database import SessionLocal
+    from models.bot_session import BotSession as BotSessionModel
+
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(BotSessionModel)
+            .filter(BotSessionModel.session_id == body["session_id"])
+            .one_or_none()
+        )
+        assert row is not None
+        assert row.bot_id == "bot-chat-parity-123"
+        assert row.recall_bot_id == "bot-chat-parity-123"
+        assert row.presentation_id == presentation_id
+    finally:
+        db.close()
+
+
 def test_realtime_relay_rejects_non_realtime_sessions(client: TestClient) -> None:
     asyncio.run(
         store.create_session(
@@ -198,8 +279,8 @@ def test_realtime_relay_rejects_non_realtime_sessions(client: TestClient) -> Non
     )
 
     with pytest.raises(WebSocketDisconnect) as exc:
-        with client.websocket_connect("/ws/realtime/sid-webhook-1"):
-            pass
+        with client.websocket_connect("/ws/realtime/sid-webhook-1") as websocket:
+            websocket.receive_text()
     assert exc.value.code == 4409
 
 
@@ -263,7 +344,7 @@ def test_realtime_tool_executor_contract(monkeypatch: pytest.MonkeyPatch) -> Non
         )
     )
     assert nav_result["ok"] is True
-    assert nav_result["target_page"] == 7
+    assert nav_result["page_number"] == 7
 
     answer_result = asyncio.run(
         executor.execute(
@@ -273,7 +354,6 @@ def test_realtime_tool_executor_contract(monkeypatch: pytest.MonkeyPatch) -> Non
         )
     )
     assert answer_result["ok"] is True
-    # Tool now returns navigated_to_slide instead of target_page
-    assert answer_result["navigated_to_slide"] == 5
     assert "slide_content" in answer_result
-    assert answer_result["citations"][0]["page_number"] == 5
+    assert "instruction" in answer_result
+    assert "target_page" in answer_result

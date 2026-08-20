@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RealtimeClient } from "@openai/realtime-api-beta";
 import { WavRecorder, WavStreamPlayer } from "wavtools";
 
+function markInactive(activeRef, setRealtimeStatus, onStatusChangeRef) {
+  activeRef.current = false;
+  setRealtimeStatus("disconnected");
+  onStatusChangeRef.current?.("connecting");
+}
+
 export function useRealtimeAgent({
   enabled,
   sessionId,
@@ -75,6 +81,10 @@ export function useRealtimeAgent({
     setRealtimeStatus("connecting");
     onStatusChangeRef.current?.("connecting");
 
+    const forceInactive = () => {
+      markInactive(activeRef, setRealtimeStatus, onStatusChangeRef);
+    };
+
     try {
       await recorder.begin();
       await player.connect();
@@ -82,15 +92,13 @@ export function useRealtimeAgent({
       client.on("error", (event) => {
         console.error("Realtime client error", event);
         isSpeakingRef.current = false;
-        setRealtimeStatus("disconnected");
         onErrorRef.current?.("Realtime relay error");
+        forceInactive();
       });
 
       client.on("disconnected", () => {
         isSpeakingRef.current = false;
-        activeRef.current = false;
-        setRealtimeStatus("disconnected");
-        onStatusChangeRef.current?.("connecting");
+        forceInactive();
       });
 
       client.on("conversation.interrupted", async () => {
@@ -136,6 +144,20 @@ export function useRealtimeAgent({
       });
 
       await client.connect();
+
+      // If the relay closes the socket without emitting "disconnected", force reconnect.
+      const socket =
+        client?.realtime?.ws ||
+        client?.realtime?.socket ||
+        client?.ws ||
+        null;
+      if (socket && typeof socket.addEventListener === "function") {
+        socket.addEventListener("close", () => {
+          isSpeakingRef.current = false;
+          forceInactive();
+        });
+      }
+
       await recorder.record((data) => client.appendInputAudio(data.mono));
 
       setRealtimeStatus("connected");
@@ -154,9 +176,31 @@ export function useRealtimeAgent({
           : "Failed to initialize realtime voice agent"
       );
       activeRef.current = false;
+      try {
+        client?.disconnect?.();
+        client?.reset?.();
+      } catch {
+        /* ignore */
+      }
       return false;
     }
   }, [enabled, relayUrl, sessionId]);
+
+  const interruptPlayback = useCallback(async () => {
+    const player = playerRef.current;
+    const client = clientRef.current;
+    try {
+      const trackSampleOffset = await player?.interrupt?.();
+      if (trackSampleOffset?.trackId && client) {
+        const { trackId, offset } = trackSampleOffset;
+        await client.cancelResponse?.(trackId, offset);
+      }
+    } catch {
+      /* ignore */
+    }
+    isSpeakingRef.current = false;
+    onStatusChangeRef.current?.("listening");
+  }, []);
 
   useEffect(() => {
     if (!enabled || !sessionId) return undefined;
@@ -174,6 +218,7 @@ export function useRealtimeAgent({
           await new Promise((resolve) => window.setTimeout(resolve, 500));
         }
         if (stopped) break;
+        await teardown();
         await new Promise((resolve) => window.setTimeout(resolve, 1000));
       }
     };
@@ -185,5 +230,5 @@ export function useRealtimeAgent({
     };
   }, [enabled, sessionId, setup, teardown]);
 
-  return { realtimeStatus, teardown };
+  return { realtimeStatus, teardown, interruptPlayback };
 }

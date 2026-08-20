@@ -313,6 +313,12 @@ class _RealtimeRelayRuntime:
             await asyncio.gather(*pending, return_exceptions=True)
 
     async def _inject_session_start_greeting_openai(self, openai_ws) -> None:
+        if bool((self._session.extra or {}).get("session_greeting_sent")):
+            logger.info(
+                "OpenAI realtime: skipping duplicate greeting session_id=%s",
+                self._session.session_id,
+            )
+            return
         if self._auto_present_limit > 0:
             self._auto_present_page = 1
             await ws_manager.broadcast_json(
@@ -365,6 +371,7 @@ class _RealtimeRelayRuntime:
                     })
                 )
             await openai_ws.send(json.dumps({"type": "response.create"}))
+            await self._set_state(session_greeting_sent=True)
             logger.info("Auto-present: injected greeting trigger at session start")
             return
 
@@ -379,6 +386,7 @@ class _RealtimeRelayRuntime:
             })
         )
         await openai_ws.send(json.dumps({"type": "response.create"}))
+        await self._set_state(session_greeting_sent=True)
         logger.info("Q&A mode: injected greeting trigger at session start")
 
     async def _run_gemini_live(self) -> None:
@@ -443,10 +451,18 @@ class _RealtimeRelayRuntime:
                 "session": {"id": self._session.session_id, "provider": "gemini"},
             }))
 
-            await self._inject_session_start_greeting_gemini(session)
-
+            # Start receive BEFORE greeting so the spoken reply cannot be dropped.
             browser_task = asyncio.create_task(self._pump_browser_to_gemini())
             gemini_task = asyncio.create_task(self._pump_gemini_to_browser())
+            await asyncio.sleep(0)
+            try:
+                await self._inject_session_start_greeting_gemini(session)
+            except Exception as exc:
+                browser_task.cancel()
+                gemini_task.cancel()
+                await asyncio.gather(browser_task, gemini_task, return_exceptions=True)
+                raise RuntimeError(f"Gemini greeting inject failed: {exc}") from exc
+
             done, pending = await asyncio.wait(
                 [browser_task, gemini_task],
                 return_when=asyncio.FIRST_COMPLETED,
@@ -459,7 +475,19 @@ class _RealtimeRelayRuntime:
                 task.cancel()
             await asyncio.gather(*pending, return_exceptions=True)
 
+    async def _gemini_send_speak_text(self, session, text: str) -> None:
+        """Trigger a spoken Live turn. Native-audio models expect realtime text input."""
+        await session.send_realtime_input(text=text)
+
     async def _inject_session_start_greeting_gemini(self, session) -> None:
+        # One greeting per bot session — reconnects must not re-greet.
+        if bool((self._session.extra or {}).get("session_greeting_sent")):
+            logger.info(
+                "Gemini Live: skipping duplicate greeting session_id=%s",
+                self._session.session_id,
+            )
+            return
+
         if self._auto_present_limit > 0:
             self._auto_present_page = 1
             await ws_manager.broadcast_json(
@@ -495,10 +523,9 @@ class _RealtimeRelayRuntime:
         else:
             text = "SESSION_START. Greet the participants warmly and ask how you can help."
 
-        await session.send_client_content(
-            turns={"role": "user", "parts": [{"text": text}]},
-            turn_complete=True,
-        )
+        await self._gemini_send_speak_text(session, text)
+        self._session.extra = {**(self._session.extra or {}), "session_greeting_sent": True}
+        await self._set_state(session_greeting_sent=True)
         logger.info("Gemini Live: injected greeting trigger at session start")
 
     async def _pump_browser_to_gemini(self) -> None:
@@ -541,90 +568,116 @@ class _RealtimeRelayRuntime:
                         texts.append(str(part.get("text") or ""))
                 joined = "\n".join(t for t in texts if t).strip()
                 if joined:
-                    await self._gemini_session.send_client_content(
-                        turns={"role": "user", "parts": [{"text": joined}]},
-                        turn_complete=True,
-                    )
+                    await self._gemini_send_speak_text(self._gemini_session, joined)
 
     async def _pump_gemini_to_browser(self) -> None:
+        """Continuously receive Gemini turns.
+
+        google-genai's ``session.receive()`` ends after each ``turn_complete``.
+        We must call it again for the next user/model turn or the relay dies and
+        reconnect spam re-triggers greeting.
+        """
         assert self._gemini_session is not None
-        response_id: str | None = None
-        item_id: str | None = None
-        turn_started = False
-        try:
-            async for chunk in self._gemini_session.receive():
-                await self._set_state(relay_last_event_at=_now_utc_iso())
-                if getattr(chunk, "tool_call", None):
-                    await self._handle_gemini_tool_call(chunk.tool_call)
-                    continue
-                server_content = getattr(chunk, "server_content", None)
-                if not server_content:
-                    continue
-                if getattr(server_content, "interrupted", False):
-                    speech_item = new_item_id()
-                    await self._browser_ws.send_text(json.dumps({
-                        "event_id": f"evt_{speech_item}",
-                        "type": "input_audio_buffer.speech_started",
-                        "item_id": speech_item,
-                        "audio_start_ms": 0,
-                    }))
-                    if self._auto_present_limit > 0 and not self._session.extra.get("muted"):
-                        if self._auto_present_page < self._auto_present_limit and self._model_has_narrated:
-                            await self._auto_advance_on_speech()
+        while True:
+            response_id: str | None = None
+            item_id: str | None = None
+            turn_started = False
+            chunks = 0
+            try:
+                async for chunk in self._gemini_session.receive():
+                    chunks += 1
+                    await self._set_state(relay_last_event_at=_now_utc_iso())
+                    go_away = getattr(chunk, "go_away", None) or getattr(chunk, "goAway", None)
+                    if go_away is not None:
+                        logger.warning(
+                            "Gemini Live go_away session_id=%s detail=%s",
+                            self._session.session_id,
+                            go_away,
+                        )
+                        raise RuntimeError(f"Gemini Live go_away: {go_away}")
+                    if getattr(chunk, "tool_call", None):
+                        await self._handle_gemini_tool_call(chunk.tool_call)
+                        continue
+                    server_content = getattr(chunk, "server_content", None)
+                    if not server_content:
+                        continue
+                    if getattr(server_content, "interrupted", False):
+                        speech_item = new_item_id()
+                        await self._browser_ws.send_text(json.dumps({
+                            "event_id": f"evt_{speech_item}",
+                            "type": "input_audio_buffer.speech_started",
+                            "item_id": speech_item,
+                            "audio_start_ms": 0,
+                        }))
+                        if self._auto_present_limit > 0 and not self._session.extra.get("muted"):
+                            if self._auto_present_page < self._auto_present_limit and self._model_has_narrated:
+                                await self._auto_advance_on_speech()
 
-                async def ensure_turn() -> tuple[str, str]:
-                    nonlocal response_id, item_id, turn_started
-                    if turn_started and response_id and item_id:
+                    async def ensure_turn() -> tuple[str, str]:
+                        nonlocal response_id, item_id, turn_started
+                        if turn_started and response_id and item_id:
+                            return response_id, item_id
+                        response_id = new_response_id()
+                        item_id = new_item_id()
+                        turn_started = True
+                        for evt in presenter_turn_start_events(response_id=response_id, item_id=item_id):
+                            await self._browser_ws.send_text(json.dumps(evt))
                         return response_id, item_id
-                    response_id = new_response_id()
-                    item_id = new_item_id()
-                    turn_started = True
-                    for evt in presenter_turn_start_events(response_id=response_id, item_id=item_id):
-                        await self._browser_ws.send_text(json.dumps(evt))
-                    return response_id, item_id
 
-                model_turn = getattr(server_content, "model_turn", None)
-                if model_turn and getattr(model_turn, "parts", None):
-                    for part in model_turn.parts:
-                        inline = getattr(part, "inline_data", None)
-                        if inline and getattr(inline, "data", None):
-                            pcm = inline.data
-                            if isinstance(pcm, str):
-                                pcm = decode_browser_pcm_b64(pcm)
-                            await self._record_first_audio_latency()
-                            if self._session.extra.get("muted") or self._in_chat_response:
-                                continue
+                    model_turn = getattr(server_content, "model_turn", None)
+                    if model_turn and getattr(model_turn, "parts", None):
+                        for part in model_turn.parts:
+                            inline = getattr(part, "inline_data", None)
+                            if inline and getattr(inline, "data", None):
+                                pcm = inline.data
+                                if isinstance(pcm, str):
+                                    pcm = decode_browser_pcm_b64(pcm)
+                                await self._record_first_audio_latency()
+                                if self._session.extra.get("muted") or self._in_chat_response:
+                                    continue
+                                rid, iid = await ensure_turn()
+                                await self._browser_ws.send_text(
+                                    json.dumps(presenter_audio_delta_event(
+                                        item_id=iid,
+                                        pcm_b64=encode_pcm_b64(pcm),
+                                    ))
+                                )
+                    out_tx = getattr(server_content, "output_transcription", None)
+                    if out_tx is not None:
+                        text = getattr(out_tx, "text", None) or str(out_tx)
+                        if text and not self._session.extra.get("muted"):
                             rid, iid = await ensure_turn()
                             await self._browser_ws.send_text(
-                                json.dumps(presenter_audio_delta_event(
-                                    item_id=iid,
-                                    pcm_b64=encode_pcm_b64(pcm),
-                                ))
+                                json.dumps(presenter_transcript_delta_event(item_id=iid, text=text))
                             )
-                out_tx = getattr(server_content, "output_transcription", None)
-                if out_tx is not None:
-                    text = getattr(out_tx, "text", None) or str(out_tx)
-                    if text and not self._session.extra.get("muted"):
-                        rid, iid = await ensure_turn()
-                        await self._browser_ws.send_text(
-                            json.dumps(presenter_transcript_delta_event(item_id=iid, text=text))
-                        )
+                            if self._in_chat_response:
+                                self._chat_reply_buffer.append(text)
+                    if getattr(server_content, "turn_complete", False):
+                        if turn_started and response_id and item_id:
+                            for evt in presenter_turn_end_events(response_id=response_id, item_id=item_id):
+                                await self._browser_ws.send_text(json.dumps(evt))
+                        turn_started = False
+                        response_id = None
+                        item_id = None
                         if self._in_chat_response:
-                            self._chat_reply_buffer.append(text)
-                if getattr(server_content, "turn_complete", False):
-                    if turn_started and response_id and item_id:
-                        for evt in presenter_turn_end_events(response_id=response_id, item_id=item_id):
-                            await self._browser_ws.send_text(json.dumps(evt))
-                    turn_started = False
-                    response_id = None
-                    item_id = None
-                    if self._in_chat_response:
-                        await self._finish_chat_response_from_buffer()
-                    if not self._model_has_narrated:
-                        self._model_has_narrated = True
-        except Exception as exc:
-            logger.error("Gemini receive loop failed session_id=%s: %s", self._session.session_id, exc)
-            raise
+                            await self._finish_chat_response_from_buffer()
+                        if not self._model_has_narrated:
+                            self._model_has_narrated = True
+                # One model turn finished — call receive() again for the next turn.
+                logger.debug(
+                    "Gemini turn complete session_id=%s chunks=%s — waiting for next turn",
+                    self._session.session_id,
+                    chunks,
+                )
+            except WebSocketDisconnect:
+                raise
+            except Exception as exc:
+                logger.error(
+                    "Gemini receive loop failed session_id=%s: %s",
+                    self._session.session_id,
+                    exc,
+                )
+                raise
 
     async def _handle_gemini_tool_call(self, tool_call) -> None:
         from google.genai import types
@@ -670,7 +723,7 @@ class _RealtimeRelayRuntime:
                         self._session.session_id,
                         {"type": "tool_done", "call_id": call_id, "tool_name": tool_name},
                     )
-                new_page = output.get("page_number")
+                new_page = output.get("page_number") or output.get("target_page")
                 if new_page and int(new_page) != self._current_page:
                     self._current_page = int(new_page)
                 if output.get("action") == "async_job_started":
@@ -1033,18 +1086,13 @@ class _RealtimeRelayRuntime:
         self._chat_reply_sender = sender
         self._chat_reply_buffer = []
         try:
-            await self._gemini_session.send_client_content(
-                turns={
-                    "role": "user",
-                    "parts": [{
-                        "text": (
-                            f"[MEETING CHAT from {sender}]: {text}\n\n"
-                            "Reply concisely in 1-3 sentences. Your spoken audio will be ignored; "
-                            "keep the answer short."
-                        ),
-                    }],
-                },
-                turn_complete=True,
+            await self._gemini_send_speak_text(
+                self._gemini_session,
+                (
+                    f"[MEETING CHAT from {sender}]: {text}\n\n"
+                    "Reply concisely in 1-3 sentences. Your spoken audio will be ignored; "
+                    "keep the answer short."
+                ),
             )
             return True
         except Exception as exc:
@@ -1058,17 +1106,12 @@ class _RealtimeRelayRuntime:
         """Speak a reply to an injected meeting chat (unmute greetings, etc.)."""
         if self._provider == "gemini" and self._gemini_session is not None:
             try:
-                await self._gemini_session.send_client_content(
-                    turns={
-                        "role": "user",
-                        "parts": [{
-                            "text": (
-                                f"[MEETING CHAT from {sender}]: {text}\n\n"
-                                "Respond to this naturally and briefly via speech."
-                            ),
-                        }],
-                    },
-                    turn_complete=True,
+                await self._gemini_send_speak_text(
+                    self._gemini_session,
+                    (
+                        f"[MEETING CHAT from {sender}]: {text}\n\n"
+                        "Respond to this naturally and briefly via speech."
+                    ),
                 )
                 return True
             except Exception as exc:
@@ -1212,7 +1255,7 @@ class _RealtimeRelayRuntime:
             asyncio.create_task(self._simulate_external_job(query, call_id))
 
         # Update current page if navigation happened
-        new_page = output.get("page_number")
+        new_page = output.get("page_number") or output.get("target_page")
         if new_page and int(new_page) != self._current_page:
             self._current_page = int(new_page)
             await self._push_session_update()
@@ -1235,6 +1278,15 @@ class _RealtimeRelayRuntime:
                 auto_present_pages=auto_present_pages,
                 last_retrieval_context=last_context,
             )
+            # Prefer CURRENTLY SHOWING / current-page block; do not rely on tail truncation alone.
+            showing_marker = "CURRENTLY SHOWING"
+            if showing_marker in instructions:
+                idx = instructions.find(showing_marker)
+                showing_block = instructions[idx : idx + 1200]
+                tail = instructions[-800:] if len(instructions) > 800 else instructions
+                context_body = f"{showing_block}\n...\n{tail}"
+            else:
+                context_body = instructions[-1500:] if len(instructions) > 1500 else instructions
             # Live sessions fix system_instruction at connect; inject a silent context note.
             await self._gemini_session.send_client_content(
                 turns={
@@ -1242,7 +1294,7 @@ class _RealtimeRelayRuntime:
                     "parts": [{
                         "text": (
                             f"[CONTEXT UPDATE — do not speak this aloud]\n"
-                            f"Now on page {self._current_page}.\n{instructions[-1500:]}"
+                            f"Now on page {self._current_page}.\n{context_body}"
                         ),
                     }],
                 },
@@ -1375,10 +1427,14 @@ class _RealtimeRelayRuntime:
 
     async def _inject_user_text(self, text: str, *, turn_complete: bool = True) -> None:
         if self._provider == "gemini" and self._gemini_session is not None:
-            await self._gemini_session.send_client_content(
-                turns={"role": "user", "parts": [{"text": text}]},
-                turn_complete=turn_complete,
-            )
+            if turn_complete:
+                await self._gemini_send_speak_text(self._gemini_session, text)
+            else:
+                # Silent context only — do not trigger a spoken turn.
+                await self._gemini_session.send_client_content(
+                    turns={"role": "user", "parts": [{"text": text}]},
+                    turn_complete=False,
+                )
             return
         if self._openai_ws is None:
             return

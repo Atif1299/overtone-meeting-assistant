@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     gemini_live_model: str = "gemini-2.5-flash-native-audio-preview-12-2025"
     gemini_live_voice: str = "Kore"
     indexer_provider: Literal["auto", "openai", "gemini"] = "auto"
-    gemini_vision_model: str = "gemini-2.0-flash"
+    gemini_vision_model: str = "gemini-2.5-flash"
     azure_search_endpoint: str = ""
     azure_search_key: str = ""
     azure_search_index_name: str = "overtone"

@@ -19,12 +19,13 @@ function parseQuery() {
 export default function App() {
   const { session, presentation, wss, mode } = parseQuery();
   const isRealtimeMode = mode !== "webhook";
-  const { currentPage, totalPages, setTotalPages, goTo } = useSlideNavigation(1, 20);
+  const { currentPage, totalPages, setTotalPages, goTo } = useSlideNavigation(1, 0);
   const [status, setStatus] = useState("listening");
   const [transitioning, setTransitioning] = useState(false);
   const [activeTools, setActiveTools] = useState({});
   const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef(null);
+  const fillerRef = useRef(null);
 
   const playAudio = useCallback((url) => {
     if (!url || !audioRef.current) return;
@@ -58,10 +59,8 @@ export default function App() {
       .catch(() => {});
   }, [presentation, setTotalPages]);
 
-  const fillerRef = useRef(null);
   const playFillerAudio = useCallback((b64) => {
     if (!b64) return;
-    // Stop any currently playing filler to prevent overlap
     if (fillerRef.current) {
       fillerRef.current.pause();
       fillerRef.current = null;
@@ -85,14 +84,63 @@ export default function App() {
     }
   }, []);
 
+  const stopFiller = useCallback(() => {
+    if (fillerRef.current) {
+      try {
+        fillerRef.current.pause();
+      } catch {
+        /* ignore */
+      }
+      fillerRef.current = null;
+    }
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  const relayUrl = session ? wss || realtimeRelayWsUrl(session) : "";
+  const { realtimeStatus, interruptPlayback } = useRealtimeAgent({
+    enabled: isRealtimeMode,
+    sessionId: session,
+    relayUrl,
+    onAssistantText: useCallback(() => {}, []),
+    onStatusChange: useCallback((nextStatus) => {
+      setStatus(nextStatus);
+    }, []),
+    onError: useCallback(() => {}, []),
+  });
+
+  const handleMuteChange = useCallback(
+    (muted) => {
+      setIsMuted(muted);
+      if (muted) {
+        stopFiller();
+        void interruptPlayback?.();
+      }
+    },
+    [interruptPlayback, stopFiller]
+  );
+
   const { connected } = usePresentationTransport({
     sessionId: session,
     onStatus: useCallback((next) => setStatus(next), []),
     onTranscript: useCallback(() => {}, []),
-    onNavigate: useCallback((page) => { goTo(page); }, [goTo]),
-    onAnswer: useCallback(({ audioUrl }) => {
-      if (audioUrl) playAudio(audioUrl);
-    }, [playAudio]),
+    onNavigate: useCallback(
+      (page) => {
+        goTo(page);
+      },
+      [goTo]
+    ),
+    onAnswer: useCallback(
+      ({ audioUrl }) => {
+        if (audioUrl) playAudio(audioUrl);
+      },
+      [playAudio]
+    ),
     onPlayFiller: playFillerAudio,
     onToolStart: useCallback(({ callId, toolName }) => {
       console.log("🛠 [FRONTEND] tool_start:", toolName, callId);
@@ -100,10 +148,7 @@ export default function App() {
     }, []),
     onToolDone: useCallback(({ callId, toolName }) => {
       console.log("✅ [FRONTEND] tool_done:", toolName, callId);
-      // Mark as done first
       setActiveTools((prev) => ({ ...prev, [callId]: { name: toolName, status: "done" } }));
-      
-      // Then remove after 2 seconds
       setTimeout(() => {
         setActiveTools((prev) => {
           const next = { ...prev };
@@ -112,17 +157,7 @@ export default function App() {
         });
       }, 2000);
     }, []),
-    onMuteChange: useCallback((muted) => { setIsMuted(muted); }, []),
-    onError: useCallback(() => {}, []),
-  });
-
-  const relayUrl = session ? wss || realtimeRelayWsUrl(session) : "";
-  const { realtimeStatus } = useRealtimeAgent({
-    enabled: isRealtimeMode,
-    sessionId: session,
-    relayUrl,
-    onAssistantText: useCallback(() => {}, []),
-    onStatusChange: useCallback((nextStatus) => { setStatus(nextStatus); }, []),
+    onMuteChange: handleMuteChange,
     onError: useCallback(() => {}, []),
   });
 

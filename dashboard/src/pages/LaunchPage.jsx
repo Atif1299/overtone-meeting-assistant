@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BotConfigForm from "../components/BotConfigForm.jsx";
-import { apiGet, apiPost, apiBase } from "../utils/api.js";
+import { apiGet, apiPost } from "../utils/api.js";
 
 export default function LaunchPage() {
   const nav = useNavigate();
@@ -22,26 +22,45 @@ export default function LaunchPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let timer = null;
 
-    async function loadPresentations() {
+    const loadPresentations = async () => {
       try {
         const data = await apiGet("/api/v1/presentations");
         if (cancelled) return;
         const list = (Array.isArray(data) ? data : []).filter((item) => item.status === "ready");
         setPresentations(list);
         setPresentationsError("");
-        if (
-          list.length > 0 &&
-          (!cfg.presentation_id || !list.some((item) => item.presentation_id === cfg.presentation_id))
-        ) {
-          setCfg((prev) => ({ ...prev, presentation_id: list[0].presentation_id }));
-        }
+        setCfg((prev) => {
+          const stillValid =
+            prev.presentation_id &&
+            list.some((item) => item.presentation_id === prev.presentation_id);
+          if (stillValid) return prev;
+          return {
+            ...prev,
+            presentation_id: list[0]?.presentation_id || "",
+          };
+        });
       } catch (e) {
         if (!cancelled) {
           setPresentationsError(String(e.message || e));
         }
+      } finally {
+        if (!cancelled) {
+          timer = window.setTimeout(loadPresentations, 2000);
+        }
       }
-    }
+    };
+
+    loadPresentations();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
 
     async function loadAgents() {
       try {
@@ -52,12 +71,20 @@ export default function LaunchPage() {
         setAgentsError("");
         if (list.length > 0) {
           const matched = list.find((item) => item.agent_name === cfg.agent_name) || list[0];
-          setCfg((prev) => ({
-            ...prev,
-            agent_name: matched.agent_name,
-            presentation_id:
-              matched.active_presentation_id || prev.presentation_id || list[0].active_presentation_id || "",
-          }));
+          setCfg((prev) => {
+            const candidate = matched.active_presentation_id || "";
+            const readyMatch = presentations.some((p) => p.presentation_id === candidate);
+            return {
+              ...prev,
+              agent_name: matched.agent_name,
+              presentation_id: readyMatch
+                ? candidate
+                : prev.presentation_id &&
+                    presentations.some((p) => p.presentation_id === prev.presentation_id)
+                  ? prev.presentation_id
+                  : "",
+            };
+          });
         }
       } catch (e) {
         if (!cancelled) {
@@ -66,12 +93,13 @@ export default function LaunchPage() {
       }
     }
 
-    loadPresentations();
     loadAgents();
     return () => {
       cancelled = true;
     };
-  }, []);
+    // Only re-evaluate agent defaults when the ready catalog changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presentations]);
 
   async function launch() {
     setErr("");
