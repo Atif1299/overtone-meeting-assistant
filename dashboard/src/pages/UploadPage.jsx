@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import FileUploader from "../components/FileUploader.jsx";
 import IndexingProgress from "../components/IndexingProgress.jsx";
-import { apiUpload, apiGet, apiPost } from "../utils/api.js";
+import { apiUpload, apiGet, apiPost, apiDelete } from "../utils/api.js";
 
 export default function UploadPage() {
   const [pres, setPres] = useState(null);
@@ -10,6 +10,7 @@ export default function UploadPage() {
   const [err, setErr] = useState("");
   const [uploading, setUploading] = useState(false);
   const [reindexingId, setReindexingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
   const [lastCheckedAt, setLastCheckedAt] = useState(null);
 
   const activePresentationId = useMemo(
@@ -52,7 +53,7 @@ export default function UploadPage() {
 
     const poll = async () => {
       try {
-        const status = await apiGet(`/api/index-status/${activePresentationId}`);
+        const status = await apiGet(`/api/v1/presentations/${activePresentationId}`);
         if (cancelled) return;
         setIndexStatus(status);
         setPres((prev) =>
@@ -85,7 +86,7 @@ export default function UploadPage() {
   }, [activePresentationId]);
 
   function triggerIndexingRun(presentationId) {
-    return apiPost(`/api/index-status/${presentationId}/run`, {}, { timeoutMs: 0 }).catch((error) => {
+    return apiPost(`/api/v1/presentations/${presentationId}/reindex`, {}, { timeoutMs: 0 }).catch((error) => {
       setErr((prev) => prev || `Failed to start indexing: ${String(error?.message || error)}`);
     });
   }
@@ -102,13 +103,7 @@ export default function UploadPage() {
       const list = await apiGet("/api/v1/presentations");
       setPresentations(Array.isArray(list) ? list : []);
 
-      const uploadStatus = String(p?.status || "").toLowerCase();
-      if (!["indexing", "ready"].includes(uploadStatus)) {
-        // Trigger long-running indexing as a detached request.
-        void triggerIndexingRun(p.presentation_id);
-      }
-
-      const status = await apiGet(`/api/index-status/${p.presentation_id}`);
+      const status = await apiGet(`/api/v1/presentations/${p.presentation_id}`);
       setIndexStatus(status);
       setLastCheckedAt(Date.now());
     } catch (e) {
@@ -121,7 +116,7 @@ export default function UploadPage() {
   async function refresh() {
     if (!activePresentationId) return;
     try {
-      const status = await apiGet(`/api/index-status/${activePresentationId}`);
+      const status = await apiGet(`/api/v1/presentations/${activePresentationId}`);
       const list = await apiGet("/api/v1/presentations");
       setPresentations(Array.isArray(list) ? list : []);
       setIndexStatus(status);
@@ -146,9 +141,9 @@ export default function UploadPage() {
     setReindexingId(presentationId);
     setErr("");
     try {
-      void triggerIndexingRun(presentationId);
+      await triggerIndexingRun(presentationId);
 
-      const status = await apiGet(`/api/index-status/${presentationId}`);
+      const status = await apiGet(`/api/v1/presentations/${presentationId}`);
       setIndexStatus(status);
       setPres((prev) =>
         prev && prev.presentation_id === presentationId
@@ -167,6 +162,32 @@ export default function UploadPage() {
       setErr(String(e.message || e));
     } finally {
       setReindexingId("");
+    }
+  }
+
+  async function runDelete(presentationId, filename) {
+    if (!presentationId) return;
+    const label = filename || presentationId;
+    const confirmed = window.confirm(
+      `Delete "${label}" from the knowledge base?\n\nThis permanently removes the presentation, indexed chunks, and stored files.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(presentationId);
+    setErr("");
+    try {
+      await apiDelete(`/api/v1/presentations/${presentationId}`);
+      const list = await apiGet("/api/v1/presentations");
+      setPresentations(Array.isArray(list) ? list : []);
+      if (pres?.presentation_id === presentationId) {
+        setPres(null);
+        setIndexStatus(null);
+        setLastCheckedAt(null);
+      }
+    } catch (e) {
+      setErr(String(e.message || e));
+    } finally {
+      setDeletingId("");
     }
   }
 
@@ -251,14 +272,30 @@ export default function UploadPage() {
                     <td>{item.document_id ? <code>{item.document_id}</code> : "—"}</td>
                     <td>{typeof item.azure_indexed_chunks === "number" ? item.azure_indexed_chunks : "—"}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="button button-ghost button-sm"
-                        disabled={reindexingId === item.presentation_id}
-                        onClick={() => runReindex(item.presentation_id)}
-                      >
-                        {reindexingId === item.presentation_id ? "Re-indexing..." : "Re-index"}
-                      </button>
+                      <div className="button-row" style={{ margin: 0, gap: "0.4rem", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="button button-ghost button-sm"
+                          disabled={
+                            reindexingId === item.presentation_id ||
+                            deletingId === item.presentation_id
+                          }
+                          onClick={() => runReindex(item.presentation_id)}
+                        >
+                          {reindexingId === item.presentation_id ? "Re-indexing..." : "Re-index"}
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-ghost button-sm text-danger"
+                          disabled={
+                            reindexingId === item.presentation_id ||
+                            deletingId === item.presentation_id
+                          }
+                          onClick={() => runDelete(item.presentation_id, item.filename)}
+                        >
+                          {deletingId === item.presentation_id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

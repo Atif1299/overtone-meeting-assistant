@@ -92,7 +92,7 @@ export default function OverviewPage() {
           </p>
         </div>
         <div className="button-row quick-actions-grid">
-          <Link to="/upload" className="button button-primary">
+          <Link to="/presentations" className="button button-primary">
             Knowledge base
           </Link>
           <Link to="/launch" className="button button-secondary">

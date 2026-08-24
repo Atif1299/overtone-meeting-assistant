@@ -1,12 +1,12 @@
 {
-  "name": "voicenav-dashboard",
+  "name": "overtone-v2-dashboard",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host --port 5176",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host --port 5176",
     "test:e2e": "playwright test"
   },
   "dependencies": {

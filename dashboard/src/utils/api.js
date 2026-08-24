@@ -1,12 +1,9 @@
-const base = () => (import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000").replace(/\/$/, "");
+const base = () => (import.meta.env.VITE_API_BASE || "http://127.0.0.1:8001").replace(/\/$/, "");
 const API_TIMEOUT_MS = 12000;
 const API_UPLOAD_TIMEOUT_MS = 45000;
 const SINGLE_UPLOAD_LIMIT_BYTES = 4 * 1024 * 1024;
 const CHUNK_SIZE_BYTES = 3 * 1024 * 1024;
-const ADMIN_API_KEY = import.meta.env.VITE_ADMIN_API_KEY || "";
-// 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
-const ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY || "";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8001";
 const ADMIN_TOKEN_STORAGE_KEY = "admin_token";
 
 function getAuthToken() {
@@ -28,7 +25,7 @@ export function clearAdminSession() {
 async function apiFetch(endpoint, options = {}) {
   const headers = {
     "Content-Type": "application/json",
-    "x-api-key": ADMIN_KEY,
+    "x-api-key": getAuthToken(),
     Authorization: `Bearer ${getAuthToken()}`,
     ...(options.headers || {})
   };
@@ -66,22 +63,26 @@ export async function verifyAdminApiKey(adminApiKey) {
 }
 
 export async function createCustomer(customer_name) {
-  return apiFetch("/api/admin/customer", {
+  return apiFetch("/api/v1/customers", {
     method: "POST",
     body: JSON.stringify({ customer_name })
   });
 }
 
 export async function listCustomers() {
-  return apiFetch("/api/admin/customer");
+  return apiFetch("/api/v1/customers");
 }
 // 
 
 
 
 function withAdminHeader(headers = {}) {
-  const key = ADMIN_API_KEY || getAuthToken();
-  if (!key) return headers;
+  const key = getAuthToken();
+  if (!key) {
+    throw new Error(
+      "API key missing — sign in with your ADMIN_API_KEY first (it is no longer baked into the dashboard build)."
+    );
+  }
   return { ...headers, "X-API-Key": key };
 }
 
@@ -131,6 +132,20 @@ export async function apiPost(path, body, options = {}) {
     body: JSON.stringify(body),
   }, options.timeoutMs ?? API_TIMEOUT_MS);
   return response.json();
+}
+
+export async function apiDelete(path, options = {}) {
+  const response = await request(path, {
+    method: "DELETE",
+  }, options.timeoutMs ?? API_TIMEOUT_MS);
+  if (response.status === 204) return { ok: true };
+  const text = await response.text();
+  if (!text) return { ok: true };
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: true };
+  }
 }
 
 export async function apiUpload(file) {

@@ -75,6 +75,12 @@ export default function IndexingProgress({
         </div>
       ) : null}
 
+      {info?.brief_index_error ? (
+        <div className="alert error">
+          Slides are ready, but Briefcase indexing failed: {info.brief_index_error}
+        </div>
+      ) : null}
+
       {lastCheckedAt ? (
         <div className="helper-text">Last checked: {new Date(lastCheckedAt).toLocaleTimeString()}</div>
       ) : null}

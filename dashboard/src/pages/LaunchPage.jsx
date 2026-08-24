@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BotConfigForm from "../components/BotConfigForm.jsx";
-import { apiGet, apiPost, apiBase } from "../utils/api.js";
+import { apiGet, apiPost } from "../utils/api.js";
 
 export default function LaunchPage() {
   const nav = useNavigate();
@@ -10,7 +10,6 @@ export default function LaunchPage() {
     meeting_url: "",
     presentation_id: "",
     agent_name: "default",
-    agent_mode: "realtime",
   });
   const [presentations, setPresentations] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -30,39 +29,23 @@ export default function LaunchPage() {
         const list = (Array.isArray(data) ? data : []).filter((item) => item.status === "ready");
         setPresentations(list);
         setPresentationsError("");
-        if (
-          list.length > 0 &&
-          (!cfg.presentation_id || !list.some((item) => item.presentation_id === cfg.presentation_id))
-        ) {
+        if (list.length > 0 && !cfg.presentation_id) {
           setCfg((prev) => ({ ...prev, presentation_id: list[0].presentation_id }));
         }
       } catch (e) {
-        if (!cancelled) {
-          setPresentationsError(String(e.message || e));
-        }
+        if (!cancelled) setPresentationsError(String(e.message || e));
       }
     }
 
     async function loadAgents() {
       try {
-        const data = await apiGet("/api/agents");
+        const data = await apiGet("/api/v1/agents");
         if (cancelled) return;
-        const list = Array.isArray(data) ? data : [];
-        setAgents(list);
+        const names = Array.isArray(data?.agents) ? data.agents : ["default"];
+        setAgents(names.map((agent_name) => ({ agent_name })));
         setAgentsError("");
-        if (list.length > 0) {
-          const matched = list.find((item) => item.agent_name === cfg.agent_name) || list[0];
-          setCfg((prev) => ({
-            ...prev,
-            agent_name: matched.agent_name,
-            presentation_id:
-              matched.active_presentation_id || prev.presentation_id || list[0].active_presentation_id || "",
-          }));
-        }
       } catch (e) {
-        if (!cancelled) {
-          setAgentsError(String(e.message || e));
-        }
+        if (!cancelled) setAgentsError(String(e.message || e));
       }
     }
 
@@ -77,14 +60,14 @@ export default function LaunchPage() {
     setErr("");
     setLoading(true);
     try {
-      const payload = {
-        ...cfg,
-        presentation_id: cfg.presentation_id || undefined,
-      };
-      const r = await apiPost("/api/launch-bot", payload);
+      const r = await apiPost("/api/v1/sessions/launch", {
+        meeting_url: cfg.meeting_url,
+        presentation_id: cfg.presentation_id,
+        bot_name: cfg.bot_name,
+        agent_name: cfg.agent_name || "default",
+      });
       setResult(r);
       sessionStorage.setItem("overtone_session_id", r.session_id);
-      sessionStorage.setItem("overtone_bot_id", r.bot_id);
       sessionStorage.setItem("overtone_presentation_id", r.presentation_id);
     } catch (e) {
       setErr(String(e.message || e));
@@ -98,76 +81,56 @@ export default function LaunchPage() {
       <header className="page-header reveal">
         <p className="eyebrow">Operations</p>
         <h1>Launch meeting bot</h1>
-        <p className="helper-text">
-          Join a meeting, bind an agent profile, and route output media to the presentation UI.
-          The selected presentation remains the strict filter for RAG retrieval.
-        </p>
+        <p className="lede">Paste a Meet/Zoom/Teams URL and a ready deck. Realtime voice only.</p>
       </header>
 
-      <div className="card stack-gap reveal">
-        <div className="section-heading">
-          <h2>Launch configuration</h2>
-          <p className="helper-text">
-            Fill the meeting details, choose mode/profile, then launch with one action.
-          </p>
-        </div>
-        <BotConfigForm
-          value={cfg}
-          presentations={presentations}
-          agents={agents}
-          onChange={setCfg}
-          onSubmit={launch}
-          disabled={loading}
-        />
-        {presentationsError ? (
-          <div className="alert warning">
-            Could not load presentations automatically: {presentationsError}
-          </div>
-        ) : null}
-        {agentsError ? (
-          <div className="alert warning">Could not load agents automatically: {agentsError}</div>
-        ) : null}
+      {presentationsError && <p className="error">{presentationsError}</p>}
+      {agentsError && <p className="error">{agentsError}</p>}
+      {err && <p className="error">{err}</p>}
+
+      <BotConfigForm
+        value={cfg}
+        onChange={setCfg}
+        presentations={presentations}
+        agents={agents}
+        onSubmit={launch}
+        disabled={loading}
+      />
+
+      <div className="row gap">
+        {result?.session_id && (
+          <button type="button" className="btn" onClick={() => nav("/session")}>
+            Open session
+          </button>
+        )}
       </div>
 
-      {err ? <div className="alert error">{err}</div> : null}
-
-      {result ? (
-        <div className="card stack-gap launch-result reveal">
-          <h2>Bot launched</h2>
-          <div className="session-metrics-grid">
-            <p>
-              <strong>session_id:</strong> {result.session_id}
-            </p>
-            <p>
-              <strong>bot_id:</strong> {result.bot_id}
-            </p>
-            <p>
-              <strong>Agent mode:</strong> {result.agent_mode}
-            </p>
-            <p>
-              <strong>Agent:</strong> {result.agent_name}
-              {result.agent_version ? ` (v${result.agent_version})` : ""}
-            </p>
+      {result && (
+        <div className="card stack-gap reveal" style={{ marginTop: 16 }}>
+          <div className="section-heading">
+            <h2>Session started</h2>
+            <p className="helper-text">Bot is joining the meeting. Open Session to monitor live status.</p>
           </div>
-          <p className="helper-text break-all">
-            <strong>Output media URL:</strong> {result.output_media_url}
-          </p>
-          {result.realtime_relay_url ? (
-            <p className="helper-text break-all">
-              <strong>Realtime relay:</strong> {result.realtime_relay_url}
-            </p>
-          ) : null}
-          <div className="button-row">
-            <button
-              type="button"
-              className="button button-primary"
-              onClick={() => nav(`/session?sid=${encodeURIComponent(result.session_id)}`)}
-            >
-              Open session monitor
-            </button>
-          </div>
+          <dl className="launch-result-grid">
+            <div>
+              <dt>Session ID</dt>
+              <dd><code>{result.session_id}</code></dd>
+            </div>
+            <div>
+              <dt>Recall bot</dt>
+              <dd><code>{result.recall_bot_id || "pending"}</code></dd>
+            </div>
+            <div>
+              <dt>State</dt>
+              <dd>{result.state}</dd>
+            </div>
+          </dl>
+          <details>
+            <summary className="helper-text">Raw launch response</summary>
+            <pre className="code-block">{JSON.stringify(result, null, 2)}</pre>
+          </details>
         </div>
-      ) : null}
+      )}
     </section>
   );
 }

@@ -118,41 +118,23 @@ export default function BotConfigForm({
           RAG filtering scope: <strong>{selectedPresentation.presentation_id}</strong> only.
         </div>
       ) : null}
-      <div className="form-grid">
-        <label className="field">
-          Agent mode
-          <select
-            className="input"
-            value={value.agent_mode || "realtime"}
-            onChange={(e) => onChange({ ...value, agent_mode: e.target.value })}
-          >
-            <option value="realtime">Realtime (primary)</option>
-            <option value="webhook">Webhook fallback</option>
-          </select>
-        </label>
-        <label className="field">
-          Auto-present first N slides
-          <input
-            className="input"
-            type="number"
-            min="0"
-            max="200"
-            placeholder="0 = Q&A only"
-            value={value.auto_present_pages ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                auto_present_pages: e.target.value ? parseInt(e.target.value, 10) : null,
-              })
-            }
-          />
-        </label>
-      </div>
-      {value.auto_present_pages > 0 && (
-        <div className="helper-text">
-          Bot will auto-narrate slides 1–{value.auto_present_pages}, then switch to Q&A mode.
-        </div>
-      )}
+      <label className="field">
+        Auto-present first N slides (optional)
+        <input
+          className="input"
+          type="number"
+          min="0"
+          max="200"
+          placeholder="0 = Q&A only"
+          value={value.auto_present_pages ?? ""}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              auto_present_pages: e.target.value ? parseInt(e.target.value, 10) : null,
+            })
+          }
+        />
+      </label>
       <button type="submit" disabled={disabled} className="button button-primary">
         {disabled ? "Launching..." : "Connect bot"}
       </button>

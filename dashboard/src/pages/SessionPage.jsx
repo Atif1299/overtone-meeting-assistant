@@ -37,7 +37,7 @@ export default function SessionPage() {
     if (!sessionId) return;
     let cancelled = false;
     const tick = () => {
-      apiGet(`/api/session/${sessionId}`)
+      apiGet(`/api/v1/sessions/${sessionId}`)
         .then((d) => {
           if (!cancelled) {
             setData(d);

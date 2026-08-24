@@ -50,29 +50,24 @@ export default function App() {
   const pathname = location.pathname;
 
   const isAdminPage = pathname === "/admin";
-  const isTestFormPage = pathname === "/testform";
 
   function handleAdminAuthSuccess() {
     setIsAdminAuthenticated(true);
-    navigate("/admin");
+    navigate("/");
   }
 
   function handleAdminLogout() {
     clearAdminSession();
     setIsAdminAuthenticated(false);
-    navigate("/admin");
   }
 
-  // Standalone Pages (No Sidebar / Header)
-  if (isAdminPage) {
-    if (!isAdminAuthenticated) {
-      return <Testform onAuthSuccess={handleAdminAuthSuccess} />;
-    }
-    return <AdminPage onLogout={handleAdminLogout} onAuthExpired={handleAdminLogout} />;
-  }
-
-  if (isTestFormPage) {
+  // No baked VITE_ADMIN_API_KEY — whole workspace requires login first.
+  if (!isAdminAuthenticated) {
     return <Testform onAuthSuccess={handleAdminAuthSuccess} />;
+  }
+
+  if (isAdminPage) {
+    return <AdminPage onLogout={handleAdminLogout} onAuthExpired={handleAdminLogout} />;
   }
 
   return (
@@ -93,6 +88,9 @@ export default function App() {
 
         <div className="topbar-actions">
           <span className="status-chip">Production</span>
+          <button type="button" className="button button-ghost" onClick={handleAdminLogout}>
+            Sign out
+          </button>
         </div>
       </header>
 
