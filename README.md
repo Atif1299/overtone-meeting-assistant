@@ -22,3 +22,15 @@
   <a href="#deploy">Deploy</a> ·
   <a href="#live-gcp">Live</a>
 </p>
+
+---
+
+## What is Overtone?
+
+Overtone is an **AI meeting presentation agent**. Upload a PPTX or PDF, launch a bot with a Google Meet / Zoom / Teams link, and Overtone joins the call as a presenter — showing your slides as the bot camera and speaking through a realtime voice model.
+
+It reads your **indexed deck**, navigates slides on demand, and answers audience questions **grounded in slide content** — not generic chat.
+
+No separate presenter app in the meeting. Recall.ai carries the presenter webpage as output media; Gemini Live (default) or OpenAI Realtime handles speech-to-speech on the backend.
+
+---
