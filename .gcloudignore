@@ -8,11 +8,10 @@
 **/__pycache__/
 **/.pytest_cache/
 logs/
+data/
+presentations/
 *.db
-backend/.pytest_agents.db
-backend/data/*.db
-backend/generated_audio/
-backend/presentations/*/
-!backend/presentations/.gitkeep
+backend/data/
 dashboard/dist/
-frontend/dist/
+presenter/dist/
+docs/
