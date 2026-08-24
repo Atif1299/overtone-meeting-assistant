@@ -69,3 +69,50 @@ Or use the helper scripts: [`start-local.ps1`](start-local.ps1) / [`start-local.
 4. **Answer** — Tools (`navigate_to_slide`, `get_slide_details`, `search_and_answer`, …) run on the backend and stay grounded in indexed slide content.
 
 ---
+
+## Stack
+
+| Layer | Tech |
+|-------|------|
+| API | FastAPI, Postgres + pgvector, GCS |
+| Voice | Gemini Live (preferred) / OpenAI Realtime |
+| Indexing | Gemini or OpenAI Vision → OpenAI embeddings |
+| Presenter | React (Recall output-media webpage) |
+| Dashboard | React operator studio |
+
+---
+
+## Local dev
+
+| Service | Port | Folder |
+|---------|------|--------|
+| API | 8001 | `backend/` |
+| Presenter | 5175 | `presenter/` |
+| Dashboard | 5176 | `dashboard/` |
+
+Further reading: [ARCHITECTURE.md](ARCHITECTURE.md) · [TESTING.md](TESTING.md) · [deploy/DEPLOY.md](deploy/DEPLOY.md)
+
+---
+
+## Deploy
+
+Cloud Build configs live under [`deploy/`](deploy/). Each service (API, presenter, dashboard) has its own `cloudbuild.*.yaml`.
+
+See [deploy/DEPLOY.md](deploy/DEPLOY.md) for GCP project setup, secrets, and rollout steps.
+
+---
+
+## Live (GCP)
+
+| Service | URL |
+|---------|-----|
+| API | https://overtone-v2-api-4idrhaffca-uc.a.run.app |
+| Presenter | https://overtone-v2-presenter-4idrhaffca-uc.a.run.app |
+| Dashboard | https://overtone-v2-dashboard-4idrhaffca-uc.a.run.app |
+
+---
+
+## Branches
+
+- **`main`** — current product (V2 at repo root).
+- **`archive/v1`** — preserved snapshot of the previous V1 layout before promotion.
