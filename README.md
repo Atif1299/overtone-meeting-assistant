@@ -34,3 +34,38 @@ It reads your **indexed deck**, navigates slides on demand, and answers audience
 No separate presenter app in the meeting. Recall.ai carries the presenter webpage as output media; Gemini Live (default) or OpenAI Realtime handles speech-to-speech on the backend.
 
 ---
+
+## Quick start
+
+**Prerequisites:** Python 3.11+, Node 18+, Postgres with pgvector, and API keys for Recall.ai + Gemini (or OpenAI).
+
+```bash
+# API → http://127.0.0.1:8001
+cd backend
+cp .env.example .env
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8001
+
+# Presenter → http://127.0.0.1:5175
+cd presenter
+npm i && npm run dev
+
+# Dashboard → http://127.0.0.1:5176
+cd dashboard
+npm i && npm run dev
+```
+
+**Windows:** Do not append `# comments` on the same line as `npm run` in Command Prompt — cmd passes `#` to Vite and breaks the root/port.
+
+Or use the helper scripts: [`start-local.ps1`](start-local.ps1) / [`start-local.sh`](start-local.sh).
+
+---
+
+## How it works
+
+1. **Upload** — Dashboard ingests PPTX/PDF; Vision extracts per-slide metadata; pgvector stores searchable chunks.
+2. **Launch** — Paste a meeting URL; Recall.ai joins and opens the presenter page as the bot camera.
+3. **Present** — Presenter mic audio flows through the backend realtime relay → Gemini Live / OpenAI Realtime → spoken audio back into the meeting.
+4. **Answer** — Tools (`navigate_to_slide`, `get_slide_details`, `search_and_answer`, …) run on the backend and stay grounded in indexed slide content.
+
+---
