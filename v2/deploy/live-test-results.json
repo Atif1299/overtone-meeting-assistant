@@ -1,0 +1,77 @@
+﻿[
+    {
+        "test":  "health",
+        "ok":  true,
+        "detail":  "{\"status\":\"ok\",\"version\":\"v2\"}"
+    },
+    {
+        "test":  "presenter",
+        "ok":  true,
+        "detail":  "HTTP 200"
+    },
+    {
+        "test":  "dashboard",
+        "ok":  true,
+        "detail":  "HTTP 200"
+    },
+    {
+        "test":  "auth_admin",
+        "ok":  false,
+        "detail":  "The remote server returned an error: (401) Unauthorized."
+    },
+    {
+        "test":  "auth_reject",
+        "ok":  true,
+        "detail":  "HTTP 401"
+    },
+    {
+        "test":  "agents_list",
+        "ok":  true,
+        "detail":  "{\"agents\":[\"default\"]}"
+    },
+    {
+        "test":  "agents_version",
+        "ok":  true,
+        "detail":  "count=2"
+    },
+    {
+        "test":  "customers",
+        "ok":  false,
+        "detail":  "The remote server returned an error: (422) unknown."
+    },
+    {
+        "test":  "presentations_list",
+        "ok":  true,
+        "detail":  "count=6"
+    },
+    {
+        "test":  "upload",
+        "ok":  false,
+        "detail":  "Cannot overwrite variable PID because it is read-only or constant."
+    },
+    {
+        "test":  "index_job",
+        "ok":  false,
+        "detail":  "no status"
+    },
+    {
+        "test":  "page_image",
+        "ok":  false,
+        "detail":  "skipped â€” index not ready"
+    },
+    {
+        "test":  "session_launch",
+        "ok":  false,
+        "detail":  "skipped â€” index not ready"
+    },
+    {
+        "test":  "session_get",
+        "ok":  false,
+        "detail":  "skipped"
+    },
+    {
+        "test":  "session_leave",
+        "ok":  false,
+        "detail":  "skipped"
+    }
+]
