@@ -1,63 +1,67 @@
-const dashboardUrl = import.meta.env.VITE_DASHBOARD_URL || "http://127.0.0.1:5176";
+import { dashboardUrl } from "../config.js";
+import HeroSection from "../components/sections/HeroSection.jsx";
+import PricingCards from "../components/sections/PricingCards.jsx";
+import ComparisonTable from "../components/sections/ComparisonTable.jsx";
+import FAQAccordion from "../components/sections/FAQAccordion.jsx";
+import SplitFeature from "../components/sections/SplitFeature.jsx";
+import CTABand from "../components/sections/CTABand.jsx";
 
 const plans = [
-  {
-    name: "Free trial",
-    price: "$0",
-    features: ["1 bot launch / month", "1 deck upload / month", "Full presenter experience"],
-    cta: "Start free",
-    featured: false,
-  },
-  {
-    name: "Starter",
-    price: "$10",
-    period: "/mo",
-    features: ["5 bot launches / month", "3 deck uploads / month", "Email support"],
-    cta: "Get Starter",
-    featured: false,
-    plan: "starter",
-  },
-  {
-    name: "Pro",
-    price: "$20",
-    period: "/mo",
-    features: ["20 bot launches / month", "10 deck uploads / month", "Priority support"],
-    cta: "Get Pro",
-    featured: true,
-    plan: "pro",
-  },
+  { name: "Free trial", price: "$0", features: ["1 bot launch / month", "1 deck upload / month", "Full presenter experience", "Community support"], cta: "Start free" },
+  { name: "Starter", price: "$10", period: "/mo", features: ["5 bot launches / month", "3 deck uploads / month", "Agent prompt studio", "Email support"], cta: "Get Starter", plan: "starter" },
+  { name: "Pro", price: "$20", period: "/mo", features: ["20 bot launches / month", "10 deck uploads / month", "Priority support", "Best for high-volume demos"], cta: "Get Pro", plan: "pro", featured: true },
+];
+
+const compareRows = [
+  { feature: "Bot launches / month", values: ["1", "5", "20"] },
+  { feature: "Deck uploads / month", values: ["1", "3", "10"] },
+  { feature: "Agent prompt studio", values: ["✓", "✓", "✓"] },
+  { feature: "Stripe billing portal", values: ["—", "✓", "✓"] },
+  { feature: "Support", values: ["Community", "Email", "Priority"] },
+];
+
+const faq = [
+  { q: "What counts as a bot launch?", a: "Each time you click Launch and Overtone creates a new Recall bot for a meeting URL, that counts as one launch for the billing period." },
+  { q: "What counts as a deck upload?", a: "Each new PPTX or PDF you upload to your workspace counts as one upload, regardless of slide count." },
+  { q: "Can I upgrade mid-month?", a: "Yes. Upgrade through the billing page — Stripe prorates your subscription automatically." },
+  { q: "Is there a contract or lock-in?", a: "No. Cancel anytime from the Stripe customer portal. Your workspace data remains until you delete it." },
 ];
 
 export default function PricingPage() {
   return (
-    <section className="section section-light" style={{ maxWidth: "100%" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <h2>Simple pricing</h2>
-        <p className="muted">Start free. Upgrade when your demo volume grows.</p>
-        <div className="pricing-grid">
-          {plans.map((p) => (
-            <article key={p.name} className={`price-card${p.featured ? " featured" : ""}`}>
-              <h3>{p.name}</h3>
-              <div className="price">
-                {p.price}
-                {p.period ? <small style={{ fontSize: "1rem", fontWeight: 400 }}>{p.period}</small> : null}
-              </div>
-              <ul>
-                {p.features.map((f) => (
-                  <li key={f}>✓ {f}</li>
-                ))}
-              </ul>
-              <a
-                href={p.plan ? `${dashboardUrl}/signup?plan=${p.plan}` : `${dashboardUrl}/signup`}
-                className={`btn ${p.featured ? "btn-primary" : "btn-secondary"}`}
-                style={{ width: "100%" }}
-              >
-                {p.cta}
-              </a>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
+    <>
+      <HeroSection
+        badge="Pricing"
+        title="Simple plans that grow with your demo volume"
+        subtitle="Start free. Upgrade when you need more launches and uploads. No sales call required."
+        primaryCta="Start free trial"
+        primaryHref={`${dashboardUrl}/signup`}
+        imageSrc="/assets/hero-dashboard.svg"
+      />
+
+      <PricingCards plans={plans} />
+
+      <ComparisonTable rows={compareRows} />
+
+      <FAQAccordion title="Pricing questions" items={faq} />
+
+      <SplitFeature
+        eyebrow="Trust"
+        title="Secure billing through Stripe"
+        body="Payments are handled by Stripe. Manage your subscription, invoices, and payment methods from the dashboard billing page. We never store card details on our servers."
+        bullets={["Stripe Checkout for upgrades", "Customer portal for plan changes", "Usage meters reset monthly"]}
+        tone="dark"
+        reverse
+      />
+
+      <CTABand
+        title="Start presenting for free today"
+        subtitle="1 launch and 1 upload included — no credit card on signup."
+        primaryLabel="Create free account"
+        primaryHref={`${dashboardUrl}/signup`}
+        secondaryLabel="Talk to us"
+        secondaryHref="/use-cases"
+      />
+    </>
   );
 }

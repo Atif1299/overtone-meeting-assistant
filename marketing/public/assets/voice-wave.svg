@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="wave" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="#0f1623" rx="16"/>
+  <circle cx="480" cy="200" r="80" fill="url(#wave)" opacity="0.25"/>
+  <path d="M120 320 Q240 260 360 320 T600 320 T840 320" fill="none" stroke="url(#wave)" stroke-width="4"/>
+  <path d="M120 360 Q240 300 360 360 T600 360 T840 360" fill="none" stroke="#f472b6" stroke-width="3" opacity="0.6"/>
+  <text x="480" y="420" text-anchor="middle" fill="#f1f5f9" font-size="22" font-weight="700" font-family="system-ui">Gemini Live voice</text>
+  <text x="480" y="455" text-anchor="middle" fill="#94a3b8" font-size="14" font-family="system-ui">Natural speech · interruption-aware · meeting-ready</text>
+  <rect x="340" y="480" width="280" height="36" fill="#1e293b" rx="18"/>
+  <text x="480" y="503" text-anchor="middle" fill="#38bdf8" font-size="13" font-family="system-ui">Speech-to-speech realtime relay</text>
+</svg>

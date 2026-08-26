@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#f8fafc" rx="16"/>
+  <rect x="40" y="60" width="880" height="420" fill="#fff" stroke="#e2e8f0" rx="12"/>
+  <text x="80" y="110" fill="#0f172a" font-size="18" font-weight="700" font-family="system-ui">Deck indexing pipeline</text>
+  <rect x="80" y="140" width="160" height="80" fill="#eff6ff" stroke="#38bdf8" rx="10"/>
+  <text x="110" y="185" fill="#0369a1" font-size="13" font-weight="600" font-family="system-ui">Upload</text>
+  <path d="M250 180 H320" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="330" y="140" width="160" height="80" fill="#f5f3ff" stroke="#a78bfa" rx="10"/>
+  <text x="355" y="185" fill="#6d28d9" font-size="13" font-weight="600" font-family="system-ui">Vision</text>
+  <path d="M500 180 H570" stroke="#94a3b8" stroke-width="2"/>
+  <rect x="580" y="140" width="160" height="80" fill="#fdf2f8" stroke="#f472b6" rx="10"/>
+  <text x="600" y="185" fill="#be185d" font-size="13" font-weight="600" font-family="system-ui">pgvector</text>
+  <path d="M750 180 H820" stroke="#94a3b8" stroke-width="2"/>
+  <rect x="730" y="140" width="160" height="80" fill="#ecfdf5" stroke="#22c55e" rx="10"/>
+  <text x="765" y="185" fill="#15803d" font-size="13" font-weight="600" font-family="system-ui">Ready</text>
+  <rect x="80" y="280" width="800" height="160" fill="#0f172a" rx="10"/>
+  <text x="110" y="330" fill="#94a3b8" font-size="12" font-family="system-ui">Per-slide chunks · embeddings · searchable Q&amp;A</text>
+  <rect x="110" y="350" width="120" height="60" fill="#1e293b" rx="6"/>
+  <rect x="250" y="350" width="120" height="60" fill="#1e293b" rx="6"/>
+  <rect x="390" y="350" width="120" height="60" fill="#1e293b" rx="6"/>
+  <rect x="530" y="350" width="120" height="60" fill="#38bdf8" opacity="0.3" rx="6"/>
+</svg>

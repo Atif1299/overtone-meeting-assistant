@@ -1,29 +1,64 @@
-const dashboardUrl = import.meta.env.VITE_DASHBOARD_URL || "http://127.0.0.1:5176";
+import { dashboardUrl } from "../config.js";
+import HeroSection from "../components/sections/HeroSection.jsx";
+import StepsTimeline from "../components/sections/StepsTimeline.jsx";
+import SplitFeature from "../components/sections/SplitFeature.jsx";
+import FeatureGrid from "../components/sections/FeatureGrid.jsx";
+import CTABand from "../components/sections/CTABand.jsx";
 
-const steps = [
-  { n: "01", title: "Upload your deck", body: "Add a PPTX or PDF in the dashboard. Vision extracts slide content and builds a pgvector index." },
-  { n: "02", title: "Launch the bot", body: "Paste a Google Meet, Zoom, or Teams URL. Recall joins and opens the presenter as the bot camera." },
-  { n: "03", title: "Present live", body: "Overtone speaks through Gemini Live, navigates slides on demand, and stays on-script." },
-  { n: "04", title: "Answer from slides", body: "Audience questions trigger search_and_answer — responses come from your deck, not the open web." },
+const checklist = [
+  { icon: "✓", title: "A deck", body: "PPTX or PDF — your sales deck, investor pitch, or onboarding guide." },
+  { icon: "✓", title: "A meeting link", body: "Google Meet, Zoom, or Microsoft Teams URL for the session." },
+  { icon: "✓", title: "An account", body: "Free signup — no credit card. Launch your first bot in minutes." },
 ];
 
 export default function HowItWorksPage() {
   return (
-    <section className="section">
-      <h2>How it works</h2>
-      <p className="muted" style={{ maxWidth: 560 }}>Four steps from deck upload to live meeting presentation.</p>
-      <div className="steps">
-        {steps.map((s) => (
-          <article key={s.n} className="step">
-            <p className="step-num">STEP {s.n}</p>
-            <h3>{s.title}</h3>
-            <p style={{ color: "var(--muted)", marginTop: "0.5rem", fontSize: "0.95rem" }}>{s.body}</p>
-          </article>
-        ))}
-      </div>
-      <div style={{ marginTop: "2.5rem", textAlign: "center" }}>
-        <a href={`${dashboardUrl}/signup`} className="btn btn-primary">Try it free</a>
-      </div>
-    </section>
+    <>
+      <HeroSection
+        badge="Workflow"
+        title="From deck upload to live meeting in minutes"
+        subtitle="Four steps. No custom integration project. No presenter standing by."
+        primaryCta="Start free trial"
+        primaryHref={`${dashboardUrl}/signup`}
+        imageSrc="/assets/upload-index.svg"
+      />
+
+      <StepsTimeline
+        eyebrow="Step by step"
+        title="The Overtone presentation loop"
+        steps={[
+          { title: "Upload your deck", body: "Dashboard ingests PPTX/PDF. Vision extracts per-slide content. pgvector stores searchable chunks.", image: "/assets/upload-index.svg" },
+          { title: "Wait for indexing", body: "Status moves from uploaded → indexing → ready. Large decks process in the background.", image: "/assets/upload-index.svg" },
+          { title: "Launch the bot", body: "Paste meeting URL, pick the deck, click Launch. Recall joins and opens presenter as camera.", image: "/assets/bot-meeting.svg" },
+          { title: "Present & answer", body: "Voice agent speaks, navigates slides, and answers from indexed content — live in the meeting.", image: "/assets/voice-wave.svg" },
+        ]}
+      />
+
+      <SplitFeature
+        eyebrow="Behind the scenes"
+        title="What happens under the hood"
+        body="Upload flows through vision indexing into Postgres + pgvector. Launch creates a Recall bot with a signed presenter URL. Audio streams through a backend realtime relay to Gemini Live. Tool calls stay on the server — grounded in your deck."
+        bullets={["FastAPI backend · React presenter · React dashboard", "Recall.ai for meeting join · GCS for deck storage", "Workspace-isolated multi-tenant SaaS"]}
+        imageSrc="/assets/slide-navigation.svg"
+        tone="light"
+        reverse
+      />
+
+      <FeatureGrid
+        eyebrow="Requirements"
+        title="What you need to get started"
+        subtitle="Three things. That's it."
+        items={checklist}
+      />
+
+      <CTABand
+        title="Try the full loop — free"
+        subtitle="Upload a deck, launch a bot, and see Overtone present live."
+        primaryLabel="Start free trial"
+        primaryHref={`${dashboardUrl}/signup`}
+        secondaryLabel="Explore features"
+        secondaryHref="/features"
+      />
+    </>
   );
 }
