@@ -7,9 +7,9 @@ import FeatureGrid from "../components/sections/FeatureGrid.jsx";
 import CTABand from "../components/sections/CTABand.jsx";
 
 const checklist = [
-  { icon: "✓", title: "A deck", body: "PPTX or PDF — your sales deck, investor pitch, or onboarding guide." },
-  { icon: "✓", title: "A meeting link", body: "Google Meet, Zoom, or Microsoft Teams URL for the session." },
-  { icon: "✓", title: "An account", body: "Free signup — no credit card. Launch your first bot in minutes." },
+  { iconKey: "deck", title: "A deck", body: "PPTX or PDF — your sales deck, investor pitch, or onboarding guide." },
+  { iconKey: "link", title: "A meeting link", body: "Google Meet, Zoom, or Microsoft Teams URL for the session." },
+  { iconKey: "account", title: "An account", body: "Free signup — no credit card. Launch your first bot in minutes." },
 ];
 
 export default function HowItWorksPage() {

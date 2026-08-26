@@ -1,3 +1,4 @@
+import { Briefcase, TrendingUp, UsersRound } from "lucide-react";
 import { dashboardUrl } from "../config.js";
 import { media } from "../components/visuals/media.js";
 import HeroSection from "../components/sections/HeroSection.jsx";
@@ -7,9 +8,9 @@ import MetricsBand from "../components/sections/MetricsBand.jsx";
 import CTABand from "../components/sections/CTABand.jsx";
 
 const personas = [
-  { icon: "◆", title: "Sales & solutions", body: "Run repeatable product demos without pulling senior engineers into every call. Stay on-deck when prospects go off-script.", image: media.botMeeting },
-  { icon: "▲", title: "Founders & fundraising", body: "Pitch investors with a consistent narrative. Answer diligence questions from the actual slide — not from memory.", image: media.slideNavigation },
-  { icon: "◉", title: "Customer success", body: "Onboard accounts with the same playbook deck. Scale walkthroughs without scheduling conflicts.", image: media.heroDashboard },
+  { iconKey: "briefcase", title: "Sales & solutions", body: "Run repeatable product demos without pulling senior engineers into every call. Stay on-deck when prospects go off-script.", image: media.botMeeting },
+  { iconKey: "trending", title: "Founders & fundraising", body: "Pitch investors with a consistent narrative. Answer diligence questions from the actual slide — not from memory.", image: media.slideNavigation },
+  { iconKey: "users", title: "Customer success", body: "Onboard accounts with the same playbook deck. Scale walkthroughs without scheduling conflicts.", image: media.heroDashboard },
 ];
 
 export default function UseCasesPage() {
