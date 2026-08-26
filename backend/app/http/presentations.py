@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
-from app.db.models import ApiKey
-from app.http.auth import require_admin_key, require_api_key
+from app.http.auth import WorkspaceContext, assert_presentation_access, get_workspace_context
+from app.domain.usage import check_quota, increment_usage
 from app.indexing.pipeline import run_index_job
+from app.security.presenter_token import verify_presenter_token
 from app.storage import PresentationStore
 
 router = APIRouter(prefix="/api/v1/presentations", tags=["presentations"])
@@ -34,9 +34,10 @@ class PresentationOut(BaseModel):
 @router.get("", response_model=list[PresentationOut])
 def list_presentations(
     db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(require_api_key),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
-    rows = PresentationStore(db).list_all(api_key.customer_id)
+    tenant = None if ctx.is_operator else ctx.workspace_id
+    rows = PresentationStore(db).list_all(tenant)
     return [PresentationOut(**r.to_dict()) for r in rows]
 
 
@@ -45,19 +46,26 @@ async def upload_presentation(
     background: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(require_api_key),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
     settings = get_settings()
+    if not ctx.is_operator:
+        check_quota(db, ctx.workspace_id, "uploads")
+
     data = await file.read()
     if len(data) > settings.max_upload_bytes:
         raise HTTPException(status_code=413, detail="File too large")
     filename = file.filename or "deck.pdf"
     pid = str(uuid.uuid4())
     store = PresentationStore(db)
-    customer_id = None if api_key.customer_id == "operator" else api_key.customer_id
-    meta = store.create(pid, filename, customer_id=customer_id)
+    tenant_id = None if ctx.is_operator else ctx.workspace_id
+    meta = store.create(pid, filename, customer_id=tenant_id)
     store.save_source_bytes(pid, filename, data)
     background.add_task(run_index_job, pid)
+
+    if not ctx.is_operator:
+        increment_usage(db, ctx.workspace_id, "uploads")
+
     return PresentationOut(**meta.to_dict())
 
 
@@ -78,12 +86,14 @@ def reindex(
     presentation_id: str,
     background: BackgroundTasks,
     db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(require_api_key),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
     store = PresentationStore(db)
     meta = store.get(presentation_id)
     if not meta:
         raise HTTPException(status_code=404, detail="Not found")
+    if not ctx.is_operator:
+        assert_presentation_access(ctx, meta.customer_id)
     store.update(presentation_id, status="uploaded", index_error=None)
     background.add_task(run_index_job, presentation_id)
     return PresentationOut(**store.get(presentation_id).to_dict())
@@ -93,15 +103,14 @@ def reindex(
 def delete_presentation(
     presentation_id: str,
     db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(require_api_key),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
     store = PresentationStore(db)
     meta = store.get(presentation_id)
     if not meta:
         raise HTTPException(status_code=404, detail="Not found")
-    if api_key.customer_id and api_key.customer_id != "operator":
-        if meta.customer_id and meta.customer_id != api_key.customer_id:
-            raise HTTPException(status_code=404, detail="Not found")
+    if not ctx.is_operator:
+        assert_presentation_access(ctx, meta.customer_id)
     ok = store.delete(presentation_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Not found")
@@ -113,7 +122,12 @@ def page_image(
     presentation_id: str,
     page_number: int,
     db: Session = Depends(get_db),
+    session: str | None = Query(default=None),
+    token: str | None = Query(default=None),
 ):
+    if session and token:
+        if not verify_presenter_token(token, session_id=session, presentation_id=presentation_id):
+            raise HTTPException(status_code=403, detail="Invalid presenter token")
     path = PresentationStore(db).page_image_path(presentation_id, page_number)
     if not path or not path.exists():
         raise HTTPException(status_code=404, detail="Page image not found")

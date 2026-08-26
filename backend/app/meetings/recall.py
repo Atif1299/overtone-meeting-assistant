@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 import httpx
 
 from app.config import get_settings
+from app.security.presenter_token import sign_presenter_token
 
 
 class RecallClient:
@@ -22,11 +23,13 @@ class RecallClient:
     def build_output_media_url(self, *, session_id: str, presentation_id: str) -> str:
         base = self.settings.frontend_url.rstrip("/")
         wss_base = self.settings.backend_url.replace("https://", "wss://").replace("http://", "ws://").rstrip("/")
+        token = sign_presenter_token(session_id=session_id, presentation_id=presentation_id)
         qs = urlencode(
             {
                 "session": session_id,
                 "presentation": presentation_id,
                 "wss": f"{wss_base}/ws/realtime/{session_id}",
+                "token": token,
             }
         )
         return f"{base}/?{qs}"

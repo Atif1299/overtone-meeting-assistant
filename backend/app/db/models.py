@@ -81,4 +81,58 @@ class AgentVersion(Base):
     version: Mapped[int] = mapped_column(Integer)
     instructions: Mapped[str] = mapped_column(Text, default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    workspace_id: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class User(Base):
+    __tablename__ = "v2_users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    email: Mapped[str] = mapped_column(String, unique=True, index=True)
+    full_name: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class Workspace(Base):
+    __tablename__ = "v2_workspaces"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, default="")
+    owner_user_id: Mapped[str] = mapped_column(String, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class WorkspaceMember(Base):
+    __tablename__ = "v2_workspace_members"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[str] = mapped_column(String, index=True)
+    user_id: Mapped[str] = mapped_column(String, index=True)
+    role: Mapped[str] = mapped_column(String, default="owner")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
+class Subscription(Base):
+    __tablename__ = "v2_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[str] = mapped_column(String, index=True)
+    plan: Mapped[str] = mapped_column(String, default="free")
+    status: Mapped[str] = mapped_column(String, default="active")
+    stripe_customer_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    current_period_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    current_period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class UsageCounter(Base):
+    __tablename__ = "v2_usage_counters"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[str] = mapped_column(String, index=True)
+    metric: Mapped[str] = mapped_column(String, index=True)
+    period_month: Mapped[str] = mapped_column(String, index=True)
+    count: Mapped[int] = mapped_column(Integer, default=0)

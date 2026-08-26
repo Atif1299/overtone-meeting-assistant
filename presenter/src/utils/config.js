@@ -84,7 +84,13 @@ export function apiBase() {
 }
 
 export function slideImageUrl(presentationId, page) {
-  return `${apiBase()}/api/v1/presentations/${presentationId}/pages/${page}/image`;
+  const session = queryValue("session");
+  const token = queryValue("token");
+  const params = new URLSearchParams();
+  if (session) params.set("session", session);
+  if (token) params.set("token", token);
+  const qs = params.toString();
+  return `${apiBase()}/api/v1/presentations/${presentationId}/pages/${page}/image${qs ? `?${qs}` : ""}`;
 }
 
 export function slidePageUrl(presentationId, page) {

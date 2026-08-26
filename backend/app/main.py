@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.db import SessionLocal, create_tables
 from app.domain import agents as agent_store
-from app.http import agents, auth_routes, customers, presentations, sessions, webhooks
+from app.http import agents, auth_routes, billing, customers, me, presentations, sessions, webhooks
 from app.http.auth import require_admin_key
 from app.realtime import relay
 from fastapi import Depends
@@ -42,6 +42,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(auth_routes.router)
+    app.include_router(me.router)
+    app.include_router(billing.router)
     app.include_router(presentations.router)
     app.include_router(agents.router)
     app.include_router(sessions.router)

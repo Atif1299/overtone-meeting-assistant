@@ -1,0 +1,44 @@
+# Cloud Build: Overtone marketing site
+
+substitutions:
+  _REGION: us-central1
+  _RUN_REGION: us-central1
+  _SERVICE: overtone-marketing
+  _AR_REPOSITORY: overtone
+  _IMAGE_NAME: overtone-marketing
+  _VITE_DASHBOARD_URL: https://overtone-v2-dashboard-4idrhaffca-uc.a.run.app
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
+      - --build-arg
+      - VITE_DASHBOARD_URL=${_VITE_DASHBOARD_URL}
+      - -f
+      - Dockerfile
+      - .
+    dir: marketing
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPOSITORY}/${_IMAGE_NAME}:$BUILD_ID
+      - --region=${_RUN_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --memory=256Mi
+      - --max-instances=3
+
+options:
+  logging: CLOUD_LOGGING_ONLY

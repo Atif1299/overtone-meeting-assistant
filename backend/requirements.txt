@@ -18,3 +18,7 @@ websockets>=13.0
 numpy>=1.26.0
 pytest>=8.0.0
 pytest-asyncio>=0.24.0
+alembic>=1.14.0
+stripe>=11.0.0
+PyJWT>=2.9.0
+cryptography>=43.0.0

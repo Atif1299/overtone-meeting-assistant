@@ -56,6 +56,22 @@ class Settings(BaseSettings):
     indexer_vision_concurrency: int = 3
     soffice_path: str = ""
 
+    # Supabase Auth
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_jwt_secret: str = ""
+
+    # Stripe billing
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_starter: str = ""
+    stripe_price_pro: str = ""
+    marketing_url: str = "http://127.0.0.1:5177"
+    dashboard_url: str = "http://127.0.0.1:5176"
+
+    # Presenter URL signing
+    presenter_token_secret: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

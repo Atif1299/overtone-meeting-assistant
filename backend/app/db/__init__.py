@@ -30,12 +30,21 @@ def get_db() -> Session:
 
 def create_tables() -> None:
     from app.db import models  # noqa: F401
+    from app.db.schema_upgrade import ensure_schema_upgrades
 
     Base.metadata.create_all(bind=engine)
+    ensure_schema_upgrades()
     if "postgres" in DATABASE_URL.lower():
         from app.indexing.vector_store import ensure_chunks_table_safe
 
         ensure_chunks_table_safe()
+    db = SessionLocal()
+    try:
+        from app.db.migrate_legacy import migrate_legacy_customers
+
+        migrate_legacy_customers(db)
+    finally:
+        db.close()
 
 
 def is_postgres() -> bool:

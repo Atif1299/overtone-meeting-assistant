@@ -6,12 +6,28 @@ const CHUNK_SIZE_BYTES = 3 * 1024 * 1024;
 const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8001";
 const ADMIN_TOKEN_STORAGE_KEY = "admin_token";
 
-function getAuthToken() {
-  return sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || "";
+let authTokenProvider = async () => sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || "";
+
+export function setAuthTokenProvider(fn) {
+  authTokenProvider = fn;
+}
+
+async function getAuthToken() {
+  return authTokenProvider();
+}
+
+async function authHeaders(extra = {}) {
+  const token = await getAuthToken();
+  const headers = { ...extra };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+    headers["X-API-Key"] = token;
+  }
+  return headers;
 }
 
 export function hasAdminSession() {
-  return Boolean(getAuthToken());
+  return Boolean(sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY));
 }
 
 export function setAdminSession(adminKey) {
@@ -25,9 +41,8 @@ export function clearAdminSession() {
 async function apiFetch(endpoint, options = {}) {
   const headers = {
     "Content-Type": "application/json",
-    "x-api-key": getAuthToken(),
-    Authorization: `Bearer ${getAuthToken()}`,
-    ...(options.headers || {})
+    ...(await authHeaders()),
+    ...(options.headers || {}),
   };
 
   const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -77,11 +92,11 @@ export async function listCustomers() {
 
 
 function withAdminHeader(headers = {}) {
-  const key = getAuthToken();
-  if (!key) {
-    return { ...headers };
-  }
-  return { ...headers, "X-API-Key": key };
+  return headers;
+}
+
+async function buildHeaders(headers = {}) {
+  return authHeaders(headers);
 }
 
 async function parseError(response) {
@@ -90,6 +105,7 @@ async function parseError(response) {
   try {
     const data = JSON.parse(text);
     if (typeof data?.detail === "string") return data.detail;
+    if (data?.detail?.message) return data.detail.message;
     return text;
   } catch {
     return text;
@@ -103,7 +119,7 @@ async function request(path, init = {}, timeoutMs = API_TIMEOUT_MS) {
   try {
     const response = await fetch(`${base()}${path}`, {
       ...init,
-      headers: withAdminHeader(init.headers || {}),
+      headers: await buildHeaders(init.headers || {}),
       signal: controller?.signal,
     });
     if (!response.ok) throw new Error(await parseError(response));

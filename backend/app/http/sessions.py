@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
-from app.db.models import ApiKey, SessionState
+from app.db.models import SessionState
 from app.domain import agents as agent_store
 from app.domain.session_store import LiveSession, store
-from app.http.auth import require_api_key
+from app.domain.usage import check_quota, increment_usage
+from app.http.auth import WorkspaceContext, assert_session_access, get_workspace_context
 from app.meetings.recall import RecallClient
 from app.storage import PresentationStore
 
@@ -55,23 +56,30 @@ class SessionOut(BaseModel):
 async def launch_session(
     body: LaunchIn,
     db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(require_api_key),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
     settings = get_settings()
     if not settings.recall_api_key:
         raise HTTPException(status_code=400, detail="RECALL_API_KEY not configured")
 
+    if not ctx.is_operator:
+        check_quota(db, ctx.workspace_id, "launches")
+
     meta = PresentationStore(db).get(body.presentation_id)
     if not meta:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    if not ctx.is_operator:
+        assert_session_access(ctx, meta.customer_id)
     if meta.status != "ready":
         raise HTTPException(status_code=400, detail=f"Presentation status is {meta.status}, need ready")
 
-    agent_store.ensure_default_agent(db)
-    active = agent_store.get_active(db, body.agent_name) or agent_store.get_active(db, "default")
+    agent_store.ensure_default_agent(db, ctx.workspace_id if not ctx.is_operator else None)
+    active = agent_store.get_active(db, body.agent_name, ctx.workspace_id if not ctx.is_operator else None) or agent_store.get_active(
+        db, "default", ctx.workspace_id if not ctx.is_operator else None
+    )
     session_id = str(uuid.uuid4())
     bot_id = str(uuid.uuid4())
-    customer_id = None if api_key.customer_id == "operator" else api_key.customer_id
+    tenant_id = None if ctx.is_operator else ctx.workspace_id
 
     recall = RecallClient()
     output_url = recall.build_output_media_url(session_id=session_id, presentation_id=body.presentation_id)
@@ -100,13 +108,16 @@ async def launch_session(
         meeting_url=body.meeting_url,
         agent_name=body.agent_name,
         agent_version=active.version if active else 1,
-        customer_id=customer_id,
+        customer_id=tenant_id,
         bot_id=bot_id,
         recall_bot_id=recall_bot_id,
         state=SessionState.JOINING.value,
         extra={"current_page": 1, "muted": False, "session_greeting_sent": False},
     )
     store.create(sess)
+
+    if not ctx.is_operator:
+        increment_usage(db, ctx.workspace_id, "launches")
 
     return LaunchOut(
         session_id=session_id,
@@ -121,10 +132,14 @@ async def launch_session(
 
 
 @router.get("/{session_id}", response_model=SessionOut)
-def get_session(session_id: str, api_key: ApiKey = Depends(require_api_key)):
+def get_session(
+    session_id: str,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+):
     sess = store.get(session_id)
     if not sess:
         raise HTTPException(status_code=404, detail="Session not found")
+    assert_session_access(ctx, sess.customer_id)
     return SessionOut(
         session_id=sess.session_id,
         presentation_id=sess.presentation_id,
@@ -141,10 +156,14 @@ def get_session(session_id: str, api_key: ApiKey = Depends(require_api_key)):
 
 
 @router.post("/{session_id}/leave")
-async def leave_session(session_id: str, api_key: ApiKey = Depends(require_api_key)):
+async def leave_session(
+    session_id: str,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+):
     sess = store.get(session_id)
     if not sess:
         raise HTTPException(status_code=404, detail="Session not found")
+    assert_session_access(ctx, sess.customer_id)
     if sess.recall_bot_id:
         await RecallClient().leave_call(sess.recall_bot_id)
     store.update(session_id, state=SessionState.CALL_ENDED.value)
