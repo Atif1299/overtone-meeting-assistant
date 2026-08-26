@@ -32,24 +32,24 @@ export default function SignupPage() {
 
   return (
     <AuthLayout>
-      <div className="auth-card auth-card--dark">
+      <div className="auth-panel">
         <h1>Start your free trial</h1>
         <p className="auth-sub">1 deck upload and 1 bot launch included — no credit card required.</p>
         <form onSubmit={onSubmit} className="auth-form">
           <label>
             Name
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
           </label>
           <label>
             Email
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
           </label>
           <label>
             Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete="new-password" />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
-          <button type="submit" className="button button-primary auth-submit" disabled={busy}>
+          <button type="submit" className="auth-panel__submit" disabled={busy}>
             {busy ? "Creating account…" : "Create account"}
           </button>
         </form>

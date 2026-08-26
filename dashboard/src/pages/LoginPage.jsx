@@ -27,20 +27,20 @@ export default function LoginPage() {
 
   return (
     <AuthLayout>
-      <div className="auth-card auth-card--dark">
+      <div className="auth-panel">
         <h1>Sign in to Overtone</h1>
         <p className="auth-sub">Upload decks, launch bots, and present live in meetings.</p>
         <form onSubmit={onSubmit} className="auth-form">
           <label>
             Email
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
           </label>
           <label>
             Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
-          <button type="submit" className="button button-primary auth-submit" disabled={busy}>
+          <button type="submit" className="auth-panel__submit" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>

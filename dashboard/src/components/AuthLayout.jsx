@@ -1,5 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { marketingUrl, marketingNav } from "../config.js";
+import { authPlatforms } from "../platforms.js";
+import PlatformLogo from "./PlatformLogo.jsx";
 
 export default function AuthLayout({ children }) {
   const { pathname } = useLocation();
@@ -7,8 +9,6 @@ export default function AuthLayout({ children }) {
 
   return (
     <div className="auth-shell">
-      <div className="auth-shell__mesh" aria-hidden="true" />
-
       <header className="auth-shell__header">
         <a href={marketingUrl} className="auth-shell__logo">
           <span className="auth-shell__mark">▲</span> Overtone
@@ -28,18 +28,20 @@ export default function AuthLayout({ children }) {
       </header>
 
       <main className="auth-shell__main">
-        <div className="auth-shell__visual" aria-hidden="true">
-          <div className="auth-shell__visual-glow" />
-          <div className="auth-shell__visual-card">
-            <p className="auth-shell__visual-eyebrow">Live presentation agent</p>
-            <h2>Upload. Launch. Present. Answer — grounded in your deck.</h2>
-            <ul>
-              <li>Deck-grounded Q&A in Meet, Zoom, Teams</li>
-              <li>Recall bot joins as your presenter</li>
-              <li>Free trial — 1 upload, 1 launch</li>
-            </ul>
+        <aside className="auth-shell__aside">
+          <p className="auth-shell__eyebrow">Live presentation agent</p>
+          <h2 className="auth-shell__headline">Upload. Launch. Present. Answer — grounded in your deck.</h2>
+          <ul className="auth-shell__list">
+            <li>Deck-grounded Q&amp;A in live meetings</li>
+            <li>Recall bot joins as your presenter</li>
+            <li>Free trial — 1 upload, 1 launch</li>
+          </ul>
+          <div className="auth-shell__platforms">
+            {authPlatforms.map((p) => (
+              <PlatformLogo key={p.id} platform={p} size="sm" />
+            ))}
           </div>
-        </div>
+        </aside>
         <div className="auth-shell__form">{children}</div>
       </main>
 
