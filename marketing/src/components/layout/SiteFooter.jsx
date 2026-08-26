@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { dashboardUrl } from "../../config.js";
+import { platforms } from "../visuals/platforms.js";
+import PlatformLogo from "../visuals/PlatformLogo.jsx";
 
 const columns = [
   {
@@ -65,9 +67,9 @@ export default function SiteFooter() {
       <div className="footer-bottom">
         <p>© {new Date().getFullYear()} Overtone. All rights reserved.</p>
         <div className="footer-social">
-          <span>Meet</span>
-          <span>Zoom</span>
-          <span>Teams</span>
+          {platforms.slice(0, 3).map((p) => (
+            <PlatformLogo key={p.id} platform={p} size="sm" />
+          ))}
         </div>
       </div>
     </footer>
