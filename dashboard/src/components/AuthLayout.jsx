@@ -1,7 +1,18 @@
 import { Link, useLocation } from "react-router-dom";
+import { Check } from "lucide-react";
 import { marketingUrl, marketingNav } from "../config.js";
-import { authPlatforms } from "../platforms.js";
-import PlatformLogo from "./PlatformLogo.jsx";
+import BrandLogo from "./BrandLogo.jsx";
+import { integrations } from "./integrations.js";
+
+const highlights = [
+  "Deck-grounded Q&A in Meet, Zoom, Teams",
+  "Recall bot joins as your presenter",
+  "Free trial — 1 upload, 1 launch",
+];
+
+const platformLogos = integrations.filter((i) =>
+  ["googlemeet", "zoom", "microsoftteams", "recall"].includes(i.id)
+);
 
 export default function AuthLayout({ children }) {
   const { pathname } = useLocation();
@@ -28,20 +39,26 @@ export default function AuthLayout({ children }) {
       </header>
 
       <main className="auth-shell__main">
-        <aside className="auth-shell__aside">
-          <p className="auth-shell__eyebrow">Live presentation agent</p>
-          <h2 className="auth-shell__headline">Upload. Launch. Present. Answer — grounded in your deck.</h2>
-          <ul className="auth-shell__list">
-            <li>Deck-grounded Q&amp;A in live meetings</li>
-            <li>Recall bot joins as your presenter</li>
-            <li>Free trial — 1 upload, 1 launch</li>
+        <div className="auth-shell__visual">
+          <p className="auth-shell__visual-eyebrow">Live presentation agent</p>
+          <h2 className="auth-shell__visual-title">Upload. Launch. Present. Answer.</h2>
+          <p className="auth-shell__visual-lede">Grounded in your deck — not generic chat.</p>
+          <ul className="auth-shell__visual-list">
+            {highlights.map((line) => (
+              <li key={line}>
+                <Check size={16} strokeWidth={2.5} aria-hidden="true" />
+                {line}
+              </li>
+            ))}
           </ul>
           <div className="auth-shell__platforms">
-            {authPlatforms.map((p) => (
-              <PlatformLogo key={p.id} platform={p} size="sm" />
+            {platformLogos.map((brand) => (
+              <div key={brand.id} className="auth-shell__platform-tile" title={brand.label}>
+                <BrandLogo brand={brand} size={24} />
+              </div>
             ))}
           </div>
-        </aside>
+        </div>
         <div className="auth-shell__form">{children}</div>
       </main>
 
