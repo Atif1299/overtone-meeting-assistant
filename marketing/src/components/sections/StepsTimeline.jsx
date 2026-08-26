@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { useScrollReveal } from "../../hooks/useScrollReveal.js";
-import VisualFrame from "../visuals/VisualFrame.jsx";
 
 export default function StepsTimeline({ eyebrow, title, steps, ctaLabel, ctaTo }) {
   const ref = useScrollReveal();
@@ -18,7 +17,9 @@ export default function StepsTimeline({ eyebrow, title, steps, ctaLabel, ctaTo }
             <article key={step.title} className="step card-glass card-hover">
               <p className="step-num">STEP {String(i + 1).padStart(2, "0")}</p>
               {step.image ? (
-                <VisualFrame src={step.image} alt="" variant="step" />
+                <div className="step-media">
+                  <img src={step.image} alt="" loading="lazy" />
+                </div>
               ) : null}
               <h3>{step.title}</h3>
               <p>{step.body}</p>

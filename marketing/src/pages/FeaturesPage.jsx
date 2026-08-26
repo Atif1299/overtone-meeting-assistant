@@ -11,9 +11,9 @@ const capabilities = [
   { icon: "▣", title: "Deck ingestion", body: "Upload PPTX or PDF. Vision indexes every slide into searchable chunks.", image: media.uploadIndex },
   { icon: "▶", title: "Bot launch", body: "One-click Recall.ai bot join with presenter output media as camera.", image: media.botMeeting },
   { icon: "◍", title: "Live sessions", body: "Monitor bot state, transcript queue, and session health in real time.", image: media.voiceLive },
-  { icon: "◆", title: "Agent studio", body: "Version prompt instructions per workspace. Activate the tone that fits your brand." },
-  { icon: "◈", title: "Usage & billing", body: "Stripe subscriptions with monthly launch and upload quotas by plan." },
-  { icon: "◉", title: "Multi-tenant SaaS", body: "Isolated workspaces, Supabase auth, and per-tenant presentation catalogs." },
+  { icon: "◆", title: "Agent studio", body: "Version prompt instructions per workspace. Activate the tone that fits your brand.", image: media.agentStudio },
+  { icon: "◈", title: "Usage & billing", body: "Stripe subscriptions with monthly launch and upload quotas by plan.", image: media.billing },
+  { icon: "◉", title: "Multi-tenant SaaS", body: "Isolated workspaces, Supabase auth, and per-tenant presentation catalogs.", image: media.workspace },
 ];
 
 const featuresFaq = [
