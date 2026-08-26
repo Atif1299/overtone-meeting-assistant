@@ -18,7 +18,7 @@ def _extract_key(request: Request) -> str:
 
 def require_admin_key(request: Request) -> None:
     settings = get_settings()
-    if not settings.admin_api_key:
+    if settings.open_demo_access or not settings.admin_api_key:
         return
     if _extract_key(request) != settings.admin_api_key:
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -29,8 +29,8 @@ def require_api_key(request: Request, db: Session = Depends(get_db)) -> ApiKey:
     provided = _extract_key(request)
     if settings.admin_api_key and provided == settings.admin_api_key:
         return ApiKey(key=provided, customer_id="operator", customer_name="Operator", is_active=True)
-    if not provided and not settings.admin_api_key:
-        return ApiKey(key="dev", customer_id="operator", customer_name="Dev", is_active=True)
+    if settings.open_demo_access or (not provided and not settings.admin_api_key):
+        return ApiKey(key="demo", customer_id="operator", customer_name="Demo", is_active=True)
     row = db.get(ApiKey, provided)
     if not row or not row.is_active:
         raise HTTPException(status_code=401, detail="Invalid API key")

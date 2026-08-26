@@ -1,13 +1,10 @@
-import { useState } from "react";
-import { Route, Routes, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Route, Routes, NavLink, useLocation } from "react-router-dom";
 import OverviewPage from "./pages/OverviewPage.jsx";
 import UploadPage from "./pages/UploadPage.jsx";
 import LaunchPage from "./pages/LaunchPage.jsx";
 import SessionPage from "./pages/SessionPage.jsx";
 import AgentsPage from "./pages/AgentsPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
-import Testform from "./pages/Testform.jsx";
-import { clearAdminSession, hasAdminSession } from "./utils/api";
 
 const navItems = [
   {
@@ -44,30 +41,11 @@ const navItems = [
 ];
 
 export default function App() {
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(hasAdminSession);
   const location = useLocation();
-  const navigate = useNavigate();
-  const pathname = location.pathname;
-
-  const isAdminPage = pathname === "/admin";
-
-  function handleAdminAuthSuccess() {
-    setIsAdminAuthenticated(true);
-    navigate("/");
-  }
-
-  function handleAdminLogout() {
-    clearAdminSession();
-    setIsAdminAuthenticated(false);
-  }
-
-  // No baked VITE_ADMIN_API_KEY — whole workspace requires login first.
-  if (!isAdminAuthenticated) {
-    return <Testform onAuthSuccess={handleAdminAuthSuccess} />;
-  }
+  const isAdminPage = location.pathname === "/admin";
 
   if (isAdminPage) {
-    return <AdminPage onLogout={handleAdminLogout} onAuthExpired={handleAdminLogout} />;
+    return <AdminPage />;
   }
 
   return (
@@ -87,10 +65,7 @@ export default function App() {
         </div>
 
         <div className="topbar-actions">
-          <span className="status-chip">Production</span>
-          <button type="button" className="button button-ghost" onClick={handleAdminLogout}>
-            Sign out
-          </button>
+          <span className="status-chip">Demo</span>
         </div>
       </header>
 

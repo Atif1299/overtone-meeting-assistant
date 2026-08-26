@@ -265,9 +265,11 @@ export default function AdminPage({ onLogout, onAuthExpired }) {
       <div className="admin-page">
         <div className="header-row">
           <h1 className="title">Admin Customer Panel</h1>
-          <button onClick={() => onLogout?.()} className="logout-btn">
-            Logout
-          </button>
+          {onLogout ? (
+            <button onClick={() => onLogout()} className="logout-btn">
+              Logout
+            </button>
+          ) : null}
         </div>
 
         <div className="card">

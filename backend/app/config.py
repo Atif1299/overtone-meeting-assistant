@@ -21,6 +21,8 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5176,http://localhost:5176"
     )
     admin_api_key: str = ""
+    # When true, dashboard/API routes accept unauthenticated demo traffic.
+    open_demo_access: bool = False
 
     openai_api_key: str = ""
     openai_model: str = "gpt-4o"

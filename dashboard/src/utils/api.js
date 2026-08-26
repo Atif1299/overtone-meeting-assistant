@@ -79,9 +79,7 @@ export async function listCustomers() {
 function withAdminHeader(headers = {}) {
   const key = getAuthToken();
   if (!key) {
-    throw new Error(
-      "API key missing — sign in with your ADMIN_API_KEY first (it is no longer baked into the dashboard build)."
-    );
+    return { ...headers };
   }
   return { ...headers, "X-API-Key": key };
 }
