@@ -5,7 +5,7 @@ export default function SplitFeature({ eyebrow, title, body, bullets = [], image
   const ref = useScrollReveal();
 
   return (
-    <section className={`split-feature section-${tone} reveal`} ref={ref}>
+    <section className={`split-feature section-${tone} scroll-fade`} ref={ref}>
       <div className={`section-mesh section-mesh--${tone}`} aria-hidden="true" />
       <div className={`split-inner${reverse ? " reverse" : ""}`}>
         <div className="split-copy">

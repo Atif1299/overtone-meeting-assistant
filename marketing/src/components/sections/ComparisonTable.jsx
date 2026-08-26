@@ -4,7 +4,7 @@ export default function ComparisonTable({ rows, plans = ["Free", "Starter", "Pro
   const ref = useScrollReveal();
 
   return (
-    <section className="section section-dark section-elevated reveal" ref={ref}>
+    <section className="section section-dark section-elevated scroll-fade" ref={ref}>
       <div className="section-mesh section-mesh--dark" aria-hidden="true" />
       <div className="section-inner">
         <div className="section-head centered">
@@ -12,26 +12,26 @@ export default function ComparisonTable({ rows, plans = ["Free", "Starter", "Pro
           <h2>Everything included, side by side</h2>
         </div>
         <div className="compare-wrap">
-        <table className="compare-table">
-          <thead>
-            <tr>
-              <th>Feature</th>
-              {plans.map((p) => (
-                <th key={p}>{p}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.feature}>
-                <td>{row.feature}</td>
-                {row.values.map((v, i) => (
-                  <td key={plans[i]}>{v}</td>
+          <table className="compare-table">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                {plans.map((p) => (
+                  <th key={p}>{p}</th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.feature}>
+                  <td>{row.feature}</td>
+                  {row.values.map((v, i) => (
+                    <td key={plans[i]}>{v}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </section>

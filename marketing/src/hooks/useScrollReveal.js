@@ -2,34 +2,24 @@ import { useEffect, useRef } from "react";
 
 export function useScrollReveal(options = {}) {
   const ref = useRef(null);
-  const {
-    threshold = 0.15,
-    rootMargin = "0px 0px -8% 0px",
-    stagger = false,
-  } = options;
+  const { threshold = 0.08, rootMargin = "0px 0px -5% 0px" } = options;
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      el.classList.add("in-view");
-      el.querySelectorAll(".reveal-item").forEach((child) => child.classList.add("in-view"));
+      el.classList.add("is-visible");
       return undefined;
     }
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          entry.target.classList.add("in-view");
-          if (stagger) {
-            entry.target.querySelectorAll(".reveal-item").forEach((child, i) => {
-              child.style.setProperty("--reveal-i", i);
-              child.classList.add("in-view");
-            });
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
           }
-          observer.unobserve(entry.target);
         });
       },
       { threshold, rootMargin }
@@ -37,7 +27,7 @@ export function useScrollReveal(options = {}) {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [threshold, rootMargin, stagger]);
+  }, [threshold, rootMargin]);
 
   return ref;
 }

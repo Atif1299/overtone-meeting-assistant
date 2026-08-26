@@ -4,7 +4,7 @@ export default function TestimonialRow({ title, items }) {
   const ref = useScrollReveal();
 
   return (
-    <section className="section section-testimonials reveal" ref={ref}>
+    <section className="section section-testimonials scroll-fade" ref={ref}>
       <div className="section-mesh section-mesh--testimonials" aria-hidden="true" />
       <div className="section-inner">
         <div className="section-head centered">

@@ -16,7 +16,7 @@ export default function HeroSection({
   const ref = useScrollReveal();
 
   return (
-    <section className="hero section-dark reveal" ref={ref}>
+    <section className="hero section-dark scroll-fade" ref={ref}>
       <div className="section-mesh section-mesh--hero" aria-hidden="true" />
       <div className="hero-glow hero-glow-a" aria-hidden="true" />
       <div className="hero-glow hero-glow-b" aria-hidden="true" />

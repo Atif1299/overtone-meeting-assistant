@@ -5,7 +5,7 @@ export default function StepsTimeline({ eyebrow, title, steps, ctaLabel, ctaTo }
   const ref = useScrollReveal();
 
   return (
-    <section className="section section-dark section-elevated reveal" ref={ref}>
+    <section className="section section-dark section-elevated scroll-fade" ref={ref}>
       <div className="section-mesh section-mesh--dark" aria-hidden="true" />
       <div className="section-inner">
         <div className="section-head centered">

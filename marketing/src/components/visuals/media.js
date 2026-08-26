@@ -8,5 +8,3 @@ export const media = {
   billing: "/media/billing.png",
   workspace: "/media/workspace.png",
 };
-
-export { platforms } from "./platforms.js";

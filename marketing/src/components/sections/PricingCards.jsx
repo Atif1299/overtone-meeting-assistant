@@ -5,7 +5,7 @@ export default function PricingCards({ plans }) {
   const ref = useScrollReveal();
 
   return (
-    <section className="section section-pricing reveal" ref={ref}>
+    <section className="section section-pricing scroll-fade" ref={ref}>
       <div className="section-mesh section-mesh--pricing" aria-hidden="true" />
       <div className="section-inner">
         <div className="pricing-grid">

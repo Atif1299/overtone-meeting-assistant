@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { dashboardUrl } from "../../config.js";
-import { platforms } from "../visuals/platforms.js";
-import PlatformLogo from "../visuals/PlatformLogo.jsx";
+import BrandLogo from "../visuals/BrandLogo.jsx";
+import { integrations } from "../visuals/integrations.js";
 
 const columns = [
   {
@@ -37,6 +37,10 @@ const columns = [
   },
 ];
 
+const footerPlatforms = integrations.filter((i) =>
+  ["googlemeet", "zoom", "microsoftteams"].includes(i.id)
+);
+
 export default function SiteFooter() {
   return (
     <footer className="site-footer">
@@ -66,9 +70,11 @@ export default function SiteFooter() {
       </div>
       <div className="footer-bottom">
         <p>© {new Date().getFullYear()} Overtone. All rights reserved.</p>
-        <div className="footer-social">
-          {platforms.slice(0, 3).map((p) => (
-            <PlatformLogo key={p.id} platform={p} size="sm" />
+        <div className="footer-social footer-social--logos">
+          {footerPlatforms.map((brand) => (
+            <span key={brand.id} className="footer-platform" title={brand.label}>
+              <BrandLogo brand={brand} size={20} />
+            </span>
           ))}
         </div>
       </div>

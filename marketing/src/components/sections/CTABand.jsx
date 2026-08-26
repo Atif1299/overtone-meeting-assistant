@@ -4,7 +4,7 @@ export default function CTABand({ title, subtitle, primaryLabel, primaryHref, se
   const ref = useScrollReveal();
 
   return (
-    <section className="cta-band reveal" ref={ref}>
+    <section className="cta-band scroll-fade" ref={ref}>
       <div className="cta-band-inner">
         <h2>{title}</h2>
         {subtitle ? <p>{subtitle}</p> : null}
