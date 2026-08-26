@@ -1,9 +1,11 @@
 import { dashboardUrl } from "../config.js";
+import { media } from "../components/visuals/media.js";
 import HeroSection from "../components/sections/HeroSection.jsx";
 import PricingCards from "../components/sections/PricingCards.jsx";
 import ComparisonTable from "../components/sections/ComparisonTable.jsx";
 import FAQAccordion from "../components/sections/FAQAccordion.jsx";
 import SplitFeature from "../components/sections/SplitFeature.jsx";
+import TestimonialRow from "../components/sections/TestimonialRow.jsx";
 import CTABand from "../components/sections/CTABand.jsx";
 
 const plans = [
@@ -36,7 +38,7 @@ export default function PricingPage() {
         subtitle="Start free. Upgrade when you need more launches and uploads. No sales call required."
         primaryCta="Start free trial"
         primaryHref={`${dashboardUrl}/signup`}
-        imageSrc="/assets/hero-dashboard.svg"
+        imageSrc={media.heroDashboard}
       />
 
       <PricingCards plans={plans} />
@@ -54,12 +56,20 @@ export default function PricingPage() {
         reverse
       />
 
+      <TestimonialRow
+        title="Teams upgrading when demo volume picks up"
+        items={[
+          { quote: "We hit the free launch limit in week one. Starter paid for itself on the first extra demo we didn't have to staff.", name: "Sam T.", role: "Sales Ops, Series B" },
+          { quote: "Pro tier handles our weekly investor updates without thinking about quotas.", name: "Morgan L.", role: "CEO, Seed startup" },
+        ]}
+      />
+
       <CTABand
         title="Start presenting for free today"
         subtitle="1 launch and 1 upload included — no credit card on signup."
         primaryLabel="Create free account"
         primaryHref={`${dashboardUrl}/signup`}
-        secondaryLabel="Talk to us"
+        secondaryLabel="See use cases"
         secondaryHref="/use-cases"
       />
     </>

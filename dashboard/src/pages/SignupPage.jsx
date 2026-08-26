@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
+import AuthLayout from "../components/AuthLayout.jsx";
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -30,8 +31,8 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
+    <AuthLayout>
+      <div className="auth-card auth-card--dark">
         <h1>Start your free trial</h1>
         <p className="auth-sub">1 deck upload and 1 bot launch included — no credit card required.</p>
         <form onSubmit={onSubmit} className="auth-form">
@@ -48,7 +49,7 @@ export default function SignupPage() {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
-          <button type="submit" className="button button-primary" disabled={busy}>
+          <button type="submit" className="button button-primary auth-submit" disabled={busy}>
             {busy ? "Creating account…" : "Create account"}
           </button>
         </form>
@@ -56,6 +57,6 @@ export default function SignupPage() {
           Already have an account? <Link to="/login">Sign in</Link>
         </p>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

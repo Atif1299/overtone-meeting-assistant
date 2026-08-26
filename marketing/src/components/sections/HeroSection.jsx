@@ -1,4 +1,5 @@
 import { useScrollReveal } from "../../hooks/useScrollReveal.js";
+import VisualFrame from "../visuals/VisualFrame.jsx";
 
 export default function HeroSection({
   badge,
@@ -10,11 +11,13 @@ export default function HeroSection({
   secondaryHref,
   imageSrc,
   imageAlt = "Overtone product preview",
+  visual,
 }) {
   const ref = useScrollReveal();
 
   return (
     <section className="hero section-dark reveal" ref={ref}>
+      <div className="section-mesh section-mesh--hero" aria-hidden="true" />
       <div className="hero-glow hero-glow-a" aria-hidden="true" />
       <div className="hero-glow hero-glow-b" aria-hidden="true" />
       <div className="hero-inner">
@@ -31,11 +34,10 @@ export default function HeroSection({
             ) : null}
           </div>
         </div>
-        {imageSrc ? (
-          <div className="hero-visual-wrap">
-            <div className="hero-visual-overlay" aria-hidden="true" />
-            <img src={imageSrc} alt={imageAlt} className="hero-image" loading="eager" />
-          </div>
+        {(imageSrc || visual) ? (
+          <VisualFrame src={imageSrc} alt={imageAlt} variant="hero">
+            {visual}
+          </VisualFrame>
         ) : null}
       </div>
     </section>

@@ -9,6 +9,7 @@ substitutions:
   _VITE_API_BASE: https://REPLACE-WITH-V2-API.run.app
   _VITE_SUPABASE_URL: ""
   _VITE_SUPABASE_ANON_KEY: ""
+  _VITE_MARKETING_URL: https://overtone-marketing-4idrhaffca-uc.a.run.app
 
 steps:
   - name: gcr.io/cloud-builders/docker
@@ -22,6 +23,8 @@ steps:
       - VITE_SUPABASE_URL=${_VITE_SUPABASE_URL}
       - --build-arg
       - VITE_SUPABASE_ANON_KEY=${_VITE_SUPABASE_ANON_KEY}
+      - --build-arg
+      - VITE_MARKETING_URL=${_VITE_MARKETING_URL}
       - -f
       - Dockerfile
       - .

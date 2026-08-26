@@ -1,4 +1,5 @@
 import { dashboardUrl } from "../config.js";
+import { media } from "../components/visuals/media.js";
 import HeroSection from "../components/sections/HeroSection.jsx";
 import StepsTimeline from "../components/sections/StepsTimeline.jsx";
 import SplitFeature from "../components/sections/SplitFeature.jsx";
@@ -20,17 +21,17 @@ export default function HowItWorksPage() {
         subtitle="Four steps. No custom integration project. No presenter standing by."
         primaryCta="Start free trial"
         primaryHref={`${dashboardUrl}/signup`}
-        imageSrc="/assets/upload-index.svg"
+        imageSrc={media.uploadIndex}
       />
 
       <StepsTimeline
         eyebrow="Step by step"
         title="The Overtone presentation loop"
         steps={[
-          { title: "Upload your deck", body: "Dashboard ingests PPTX/PDF. Vision extracts per-slide content. pgvector stores searchable chunks.", image: "/assets/upload-index.svg" },
-          { title: "Wait for indexing", body: "Status moves from uploaded → indexing → ready. Large decks process in the background.", image: "/assets/upload-index.svg" },
-          { title: "Launch the bot", body: "Paste meeting URL, pick the deck, click Launch. Recall joins and opens presenter as camera.", image: "/assets/bot-meeting.svg" },
-          { title: "Present & answer", body: "Voice agent speaks, navigates slides, and answers from indexed content — live in the meeting.", image: "/assets/voice-wave.svg" },
+          { title: "Upload your deck", body: "Dashboard ingests PPTX/PDF. Vision extracts per-slide content. pgvector stores searchable chunks.", image: media.uploadIndex },
+          { title: "Wait for indexing", body: "Status moves from uploaded → indexing → ready. Large decks process in the background.", image: media.uploadIndex },
+          { title: "Launch the bot", body: "Paste meeting URL, pick the deck, click Launch. Recall joins and opens presenter as camera.", image: media.botMeeting },
+          { title: "Present & answer", body: "Voice agent speaks, navigates slides, and answers from indexed content — live in the meeting.", image: media.voiceLive },
         ]}
       />
 
@@ -39,7 +40,7 @@ export default function HowItWorksPage() {
         title="What happens under the hood"
         body="Upload flows through vision indexing into Postgres + pgvector. Launch creates a Recall bot with a signed presenter URL. Audio streams through a backend realtime relay to Gemini Live. Tool calls stay on the server — grounded in your deck."
         bullets={["FastAPI backend · React presenter · React dashboard", "Recall.ai for meeting join · GCS for deck storage", "Workspace-isolated multi-tenant SaaS"]}
-        imageSrc="/assets/slide-navigation.svg"
+        imageSrc={media.slideNavigation}
         tone="light"
         reverse
       />

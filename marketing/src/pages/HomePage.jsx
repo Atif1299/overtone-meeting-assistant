@@ -1,11 +1,20 @@
 import { dashboardUrl } from "../config.js";
+import { media } from "../components/visuals/media.js";
 import HeroSection from "../components/sections/HeroSection.jsx";
 import LogoBar from "../components/sections/LogoBar.jsx";
 import SplitFeature from "../components/sections/SplitFeature.jsx";
 import StepsTimeline from "../components/sections/StepsTimeline.jsx";
 import TestimonialRow from "../components/sections/TestimonialRow.jsx";
 import MetricsBand from "../components/sections/MetricsBand.jsx";
+import FAQAccordion from "../components/sections/FAQAccordion.jsx";
 import CTABand from "../components/sections/CTABand.jsx";
+
+const homeFaq = [
+  { q: "Does Overtone replace a human presenter entirely?", a: "Overtone handles scripted presentation flow and grounded Q&A from your deck. Many teams use it for first-pass demos, onboarding, and investor updates — with humans joining for negotiation or custom deep dives." },
+  { q: "Which meeting platforms are supported?", a: "Google Meet, Zoom, and Microsoft Teams via Recall.ai bots. Paste the meeting URL in Launch and Overtone joins as the presenter camera." },
+  { q: "How are answers kept on-deck?", a: "Every slide is indexed into pgvector. The voice agent uses search_and_answer and slide tools — responses come from uploaded content, not open-web knowledge." },
+  { q: "What's included in the free trial?", a: "1 deck upload and 1 bot launch per month. Full presenter experience, agent studio, and community support. No credit card on signup." },
+];
 
 export default function HomePage() {
   return (
@@ -18,7 +27,7 @@ export default function HomePage() {
         primaryHref={`${dashboardUrl}/signup`}
         secondaryCta="See how it works"
         secondaryHref="/how-it-works"
-        imageSrc="/assets/hero-dashboard.svg"
+        imageSrc={media.heroDashboard}
         imageAlt="Overtone dashboard operations overview"
       />
 
@@ -34,7 +43,6 @@ export default function HomePage() {
           "You need one operator studio — not five disconnected tools",
         ]}
         tone="light"
-        reverse={false}
       />
 
       <SplitFeature
@@ -46,7 +54,7 @@ export default function HomePage() {
           "Gemini Live speech-to-speech with natural pacing",
           "Slide navigation on audience demand",
         ]}
-        imageSrc="/assets/bot-meeting.svg"
+        imageSrc={media.botMeeting}
         imageAlt="Overtone bot presenting in a live meeting"
         tone="dark"
         reverse
@@ -58,10 +66,10 @@ export default function HomePage() {
         ctaLabel="Full walkthrough →"
         ctaTo="/how-it-works"
         steps={[
-          { title: "Upload", body: "Ingest PPTX/PDF. Vision extracts per-slide metadata into pgvector.", image: "/assets/upload-index.svg" },
-          { title: "Launch", body: "Paste a meeting URL. Recall opens the presenter as bot camera.", image: "/assets/bot-meeting.svg" },
-          { title: "Present", body: "Gemini Live speaks through the meeting with slide control tools.", image: "/assets/voice-wave.svg" },
-          { title: "Answer", body: "Audience questions trigger grounded search — not generic chat.", image: "/assets/slide-navigation.svg" },
+          { title: "Upload", body: "Ingest PPTX/PDF. Vision extracts per-slide metadata into pgvector.", image: media.uploadIndex },
+          { title: "Launch", body: "Paste a meeting URL. Recall opens the presenter as bot camera.", image: media.botMeeting },
+          { title: "Present", body: "Gemini Live speaks through the meeting with slide control tools.", image: media.voiceLive },
+          { title: "Answer", body: "Audience questions trigger grounded search — not generic chat.", image: media.slideNavigation },
         ]}
       />
 
@@ -82,6 +90,8 @@ export default function HomePage() {
           { value: "24/7", label: "Launch whenever the meeting starts" },
         ]}
       />
+
+      <FAQAccordion title="Common questions" items={homeFaq} />
 
       <CTABand
         title="Ready to present without a human in the loop?"

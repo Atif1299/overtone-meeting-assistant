@@ -1,10 +1,12 @@
 import { useScrollReveal } from "../../hooks/useScrollReveal.js";
+import VisualFrame from "../visuals/VisualFrame.jsx";
 
-export default function SplitFeature({ eyebrow, title, body, bullets = [], imageSrc, imageAlt, reverse = false, tone = "light" }) {
+export default function SplitFeature({ eyebrow, title, body, bullets = [], imageSrc, imageAlt, visual, reverse = false, tone = "light" }) {
   const ref = useScrollReveal();
 
   return (
     <section className={`split-feature section-${tone} reveal`} ref={ref}>
+      <div className={`section-mesh section-mesh--${tone}`} aria-hidden="true" />
       <div className={`split-inner${reverse ? " reverse" : ""}`}>
         <div className="split-copy">
           {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
@@ -18,11 +20,15 @@ export default function SplitFeature({ eyebrow, title, body, bullets = [], image
             </ul>
           ) : null}
         </div>
-        {imageSrc ? (
-          <div className="split-visual">
-            <div className="split-visual-glow" aria-hidden="true" />
-            <img src={imageSrc} alt={imageAlt || title} className="split-image" loading="lazy" />
-          </div>
+        {(imageSrc || visual) ? (
+          <VisualFrame
+            src={imageSrc}
+            alt={imageAlt || title}
+            variant="split"
+            align={reverse ? "left" : "right"}
+          >
+            {visual}
+          </VisualFrame>
         ) : null}
       </div>
     </section>

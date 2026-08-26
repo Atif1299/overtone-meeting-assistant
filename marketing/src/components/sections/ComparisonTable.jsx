@@ -4,12 +4,14 @@ export default function ComparisonTable({ rows, plans = ["Free", "Starter", "Pro
   const ref = useScrollReveal();
 
   return (
-    <section className="section section-dark reveal" ref={ref}>
-      <div className="section-head centered">
-        <p className="eyebrow">Compare plans</p>
-        <h2>Everything included, side by side</h2>
-      </div>
-      <div className="compare-wrap">
+    <section className="section section-dark section-elevated reveal" ref={ref}>
+      <div className="section-mesh section-mesh--dark" aria-hidden="true" />
+      <div className="section-inner">
+        <div className="section-head centered">
+          <p className="eyebrow">Compare plans</p>
+          <h2>Everything included, side by side</h2>
+        </div>
+        <div className="compare-wrap">
         <table className="compare-table">
           <thead>
             <tr>
@@ -30,6 +32,7 @@ export default function ComparisonTable({ rows, plans = ["Free", "Starter", "Pro
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </section>
   );
