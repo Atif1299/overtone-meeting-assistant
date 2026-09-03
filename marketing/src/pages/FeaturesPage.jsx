@@ -6,14 +6,15 @@ import SplitFeature from "../components/sections/SplitFeature.jsx";
 import IntegrationStrip from "../components/sections/IntegrationStrip.jsx";
 import FAQAccordion from "../components/sections/FAQAccordion.jsx";
 import CTABand from "../components/sections/CTABand.jsx";
+import ToneBand from "../components/sections/ToneBand.jsx";
 
 const capabilities = [
-  { iconKey: "upload", title: "Deck ingestion", body: "Upload PPTX or PDF. Vision indexes every slide into searchable chunks.", image: media.uploadIndex },
-  { iconKey: "rocket", title: "Bot launch", body: "One-click Recall.ai bot join with presenter output media as camera.", image: media.botMeeting },
-  { iconKey: "radio", title: "Live sessions", body: "Monitor bot state, transcript queue, and session health in real time.", image: media.voiceLive },
-  { iconKey: "sparkles", title: "Agent studio", body: "Version prompt instructions per workspace. Activate the tone that fits your brand.", image: media.agentStudio },
-  { iconKey: "billing", title: "Usage & billing", body: "Stripe subscriptions with monthly launch and upload quotas by plan.", image: media.billing },
-  { iconKey: "workspace", title: "Multi-tenant SaaS", body: "Isolated workspaces, Supabase auth, and per-tenant presentation catalogs.", image: media.workspace },
+  { iconKey: "upload", title: "Deck ingestion", body: "Upload PPTX or PDF. Vision indexes every slide into searchable chunks.", image: media.fragIngest },
+  { iconKey: "rocket", title: "Bot launch", body: "One-click Recall.ai bot join with presenter output media as camera.", image: media.fragLaunch },
+  { iconKey: "radio", title: "Live sessions", body: "Monitor bot state, transcript queue, and session health in real time.", image: media.fragSession },
+  { iconKey: "sparkles", title: "Agent studio", body: "Version prompt instructions per workspace. Activate the tone that fits your brand.", image: media.fragAgent },
+  { iconKey: "billing", title: "Usage & billing", body: "Stripe subscriptions with monthly launch and upload quotas by plan.", image: media.fragBilling },
+  { iconKey: "workspace", title: "Multi-tenant SaaS", body: "Isolated workspaces, Supabase auth, and per-tenant presentation catalogs.", image: media.fragWorkspace },
 ];
 
 const featuresFaq = [
@@ -33,7 +34,9 @@ export default function FeaturesPage() {
         primaryHref={`${dashboardUrl}/signup`}
         secondaryCta="View pricing"
         secondaryHref="/pricing"
-        imageSrc={media.heroDashboard}
+        composition="orbit"
+        compositionImages={[media.heroFeatures, media.fragAgent, media.fragWorkspace]}
+        imageAlt="Live session telemetry tiles"
       />
 
       <FeatureGrid
@@ -48,7 +51,8 @@ export default function FeaturesPage() {
         title="Upload & index — your deck becomes a knowledge base"
         body="Every slide is processed through vision models, chunked, embedded, and stored in pgvector. When the audience asks a question, the agent searches what you actually uploaded."
         bullets={["PPTX and PDF support", "Per-slide metadata extraction", "Background indexing with status tracking"]}
-        imageSrc={media.uploadIndex}
+        imageSrc={media.fragIngest}
+        imageAlt="Deck dropzone and indexing progress"
         tone="dark"
       />
 
@@ -57,21 +61,25 @@ export default function FeaturesPage() {
         title="Launch & join — Recall carries your presenter as the bot camera"
         body="Paste a Google Meet, Zoom, or Teams URL. Overtone creates a Recall bot, opens the presenter webpage as output media, and connects the realtime voice relay."
         bullets={["No separate app in the meeting", "Webhook-driven session lifecycle", "Signed presenter URLs for security"]}
-        imageSrc={media.botMeeting}
+        imageSrc={media.fragLaunch}
+        imageAlt="Meeting URL and connect bot field"
         tone="light"
         reverse
       />
 
-      <SplitFeature
-        eyebrow="Deep dive"
-        title="Live voice & grounded answers"
-        body="Gemini Live handles speech-to-speech. Tools navigate slides and search deck content — so answers stay tied to your material, not generic LLM knowledge."
-        bullets={["navigate_to_slide · get_slide_details · search_and_answer", "Interruption-aware delivery", "Concise spoken responses"]}
-        imageSrc={media.voiceLive}
-        tone="dark"
-      />
+      <ToneBand tone="dark">
+        <SplitFeature
+          eyebrow="Deep dive"
+          title="Live voice & grounded answers"
+          body="Gemini Live handles speech-to-speech. Tools navigate slides and search deck content — so answers stay tied to your material, not generic LLM knowledge."
+          bullets={["navigate_to_slide · get_slide_details · search_and_answer", "Interruption-aware delivery", "Concise spoken responses"]}
+          imageSrc={media.fragSession}
+          imageAlt="Live Q and A cards"
+          tone="dark"
+        />
 
-      <IntegrationStrip title="Integrates with your meeting stack" />
+        <IntegrationStrip title="Integrates with your meeting stack" />
+      </ToneBand>
 
       <FAQAccordion title="Platform questions" items={featuresFaq} />
 

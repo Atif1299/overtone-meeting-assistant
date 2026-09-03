@@ -1,16 +1,16 @@
-import { Briefcase, TrendingUp, UsersRound } from "lucide-react";
 import { dashboardUrl } from "../config.js";
 import { media } from "../components/visuals/media.js";
 import HeroSection from "../components/sections/HeroSection.jsx";
 import FeatureGrid from "../components/sections/FeatureGrid.jsx";
 import SplitFeature from "../components/sections/SplitFeature.jsx";
+import TestimonialRow from "../components/sections/TestimonialRow.jsx";
 import MetricsBand from "../components/sections/MetricsBand.jsx";
 import CTABand from "../components/sections/CTABand.jsx";
 
 const personas = [
-  { iconKey: "briefcase", title: "Sales & solutions", body: "Run repeatable product demos without pulling senior engineers into every call. Stay on-deck when prospects go off-script.", image: media.botMeeting },
-  { iconKey: "trending", title: "Founders & fundraising", body: "Pitch investors with a consistent narrative. Answer diligence questions from the actual slide — not from memory.", image: media.slideNavigation },
-  { iconKey: "users", title: "Customer success", body: "Onboard accounts with the same playbook deck. Scale walkthroughs without scheduling conflicts.", image: media.heroDashboard },
+  { iconKey: "briefcase", title: "Sales & solutions", body: "Run repeatable product demos without pulling senior engineers into every call. Stay on-deck when prospects go off-script.", image: media.fragSales },
+  { iconKey: "trending", title: "Founders & fundraising", body: "Pitch investors with a consistent narrative. Answer diligence questions from the actual slide — not from memory.", image: media.fragFounders },
+  { iconKey: "users", title: "Customer success", body: "Onboard accounts with the same playbook deck. Scale walkthroughs without scheduling conflicts.", image: media.fragCs },
 ];
 
 export default function UseCasesPage() {
@@ -22,7 +22,9 @@ export default function UseCasesPage() {
         subtitle="Sales demos, investor updates, customer onboarding, and any scenario where slides and voice matter."
         primaryCta="Start free trial"
         primaryHref={`${dashboardUrl}/signup`}
-        imageSrc={media.botMeeting}
+        composition="stage"
+        compositionImages={[media.fragSales, media.fragCs]}
+        imageAlt="Sales and customer-success session crops"
       />
 
       <FeatureGrid
@@ -37,8 +39,18 @@ export default function UseCasesPage() {
         title="The investor asks about slide 9 — Overtone navigates and answers"
         body="In a live fundraise call, an investor jumps to unit economics on a slide you didn't plan to cover. Overtone receives the question, navigates to the right slide, searches indexed content, and responds in natural voice — grounded in what you uploaded."
         bullets={["No 'let me get back to you on that'", "Slide navigation on audience demand", "Consistent messaging across every call"]}
-        imageSrc={media.voiceLive}
+        imageSrc={media.stepAnswer}
+        imageAlt="Spoken answer grounded in the deck"
         tone="dark"
+      />
+
+      <TestimonialRow
+        title="Operators who run the same meeting on repeat"
+        items={[
+          { quote: "We stopped scheduling three engineers for every sales call. Overtone runs the deck and stays on-message.", name: "Alex R.", role: "Head of Sales, B2B SaaS", avatar: media.avatar1 },
+          { quote: "Customer onboarding used to mean the same 45-minute walkthrough. Now we launch a bot with the playbook deck.", name: "Jordan K.", role: "CS Lead, Series A", avatar: media.avatar3 },
+          { quote: "Playbook walkthroughs no longer wait on my calendar. Every new account gets the same live onboarding from the deck.", name: "Casey N.", role: "Head of Customer Success, Series B", avatar: media.avatar6 },
+        ]}
       />
 
       <MetricsBand

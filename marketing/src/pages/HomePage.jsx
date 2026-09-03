@@ -8,6 +8,7 @@ import TestimonialRow from "../components/sections/TestimonialRow.jsx";
 import MetricsBand from "../components/sections/MetricsBand.jsx";
 import FAQAccordion from "../components/sections/FAQAccordion.jsx";
 import CTABand from "../components/sections/CTABand.jsx";
+import ToneBand from "../components/sections/ToneBand.jsx";
 
 const homeFaq = [
   { q: "Does Overtone replace a human presenter entirely?", a: "Overtone handles scripted presentation flow and grounded Q&A from your deck. Many teams use it for first-pass demos, onboarding, and investor updates — with humans joining for negotiation or custom deep dives." },
@@ -19,19 +20,22 @@ const homeFaq = [
 export default function HomePage() {
   return (
     <>
-      <HeroSection
-        badge="AI presentation agent for live meetings"
-        title="Your deck. Your meeting. Overtone presents and answers live."
-        subtitle="Upload slides, paste a Meet / Zoom / Teams link, and let Overtone join as a presenter — navigating your deck and answering questions grounded in your content."
-        primaryCta="Start free trial"
-        primaryHref={`${dashboardUrl}/signup`}
-        secondaryCta="See how it works"
-        secondaryHref="/how-it-works"
-        imageSrc={media.heroDashboard}
-        imageAlt="Overtone dashboard operations overview"
-      />
+      <ToneBand tone="dark" glow>
+        <HeroSection
+          badge="AI presentation agent for live meetings"
+          title="Your deck. Your meeting. Overtone presents and answers live."
+          subtitle="Upload slides, paste a Meet / Zoom / Teams link, and let Overtone join as a presenter — navigating your deck and answering questions grounded in your content."
+          primaryCta="Start free trial"
+          primaryHref={`${dashboardUrl}/signup`}
+          secondaryCta="See how it works"
+          secondaryHref="/how-it-works"
+          overlay
+          overlayImages={[media.heroHome, media.fragLaunch, media.fragSession]}
+          imageAlt="Overtone product fragments — overview, launch, and live session"
+        />
 
-      <LogoBar />
+        <LogoBar />
+      </ToneBand>
 
       <SplitFeature
         eyebrow="The problem"
@@ -45,40 +49,44 @@ export default function HomePage() {
         tone="light"
       />
 
-      <SplitFeature
-        eyebrow="Product spotlight"
-        title="A presenter that joins the call, shows your slides, and speaks with context"
-        body="Overtone indexes your PPTX or PDF, launches a Recall.ai bot into the meeting, and drives a realtime voice agent that navigates slides and answers from indexed content."
-        bullets={[
-          "Deck-grounded Q&A via search_and_answer tools",
-          "Gemini Live speech-to-speech with natural pacing",
-          "Slide navigation on audience demand",
-        ]}
-        imageSrc={media.botMeeting}
-        imageAlt="Overtone bot presenting in a live meeting"
-        tone="dark"
-        reverse
-      />
+      <ToneBand tone="dark">
+        <SplitFeature
+          eyebrow="Product spotlight"
+          title="A presenter that joins the call, shows your slides, and speaks with context"
+          body="Overtone indexes your PPTX or PDF, launches a Recall.ai bot into the meeting, and drives a realtime voice agent that navigates slides and answers from indexed content."
+          bullets={[
+            "Deck-grounded Q&A via search_and_answer tools",
+            "Gemini Live speech-to-speech with natural pacing",
+            "Slide navigation on audience demand",
+          ]}
+          imageSrc={media.fragAgent}
+          imageAlt="Agent studio instructions"
+          tone="dark"
+          reverse
+        />
 
-      <StepsTimeline
+        <StepsTimeline
         eyebrow="How it works"
         title="Four steps from upload to live presentation"
         ctaLabel="Full walkthrough →"
         ctaTo="/how-it-works"
         steps={[
-          { title: "Upload", body: "Ingest PPTX/PDF. Vision extracts per-slide metadata into pgvector.", image: media.uploadIndex },
-          { title: "Launch", body: "Paste a meeting URL. Recall opens the presenter as bot camera.", image: media.botMeeting },
-          { title: "Present", body: "Gemini Live speaks through the meeting with slide control tools.", image: media.voiceLive },
-          { title: "Answer", body: "Audience questions trigger grounded search — not generic chat.", image: media.slideNavigation },
+          { title: "Upload", body: "Ingest PPTX/PDF. Vision extracts per-slide metadata into pgvector.", image: media.stepUpload },
+          { title: "Launch", body: "Paste a meeting URL. Recall opens the presenter as bot camera.", image: media.stepLaunch },
+          { title: "Present", body: "Gemini Live speaks through the meeting with slide control tools.", image: media.stepPresent },
+          { title: "Answer", body: "Audience questions trigger grounded search — not generic chat.", image: media.stepAnswer },
         ]}
       />
+      </ToneBand>
 
       <TestimonialRow
         title="Built for teams who can't afford to wing live demos"
+        marquee
         items={[
-          { quote: "We stopped scheduling three engineers for every sales call. Overtone runs the deck and stays on-message.", name: "Alex R.", role: "Head of Sales, B2B SaaS" },
-          { quote: "Investors asked about unit economics on slide 9 — it navigated there and answered from our actual deck.", name: "Priya M.", role: "Founder, Seed-stage startup" },
-          { quote: "Customer onboarding used to mean the same 45-minute walkthrough. Now we launch a bot with the playbook deck.", name: "Jordan K.", role: "CS Lead, Series A" },
+          { quote: "We stopped scheduling three engineers for every sales call. Overtone runs the deck and stays on-message.", name: "Alex R.", role: "Head of Sales, B2B SaaS", avatar: media.avatar1 },
+          { quote: "Investors asked about unit economics on slide 9 — it navigated there and answered from our actual deck.", name: "Priya M.", role: "Founder, Seed-stage startup", avatar: media.avatar2 },
+          { quote: "Customer onboarding used to mean the same 45-minute walkthrough. Now we launch a bot with the playbook deck.", name: "Jordan K.", role: "CS Lead, Series A", avatar: media.avatar3 },
+          { quote: "Playbook walkthroughs no longer wait on my calendar. Every new account gets the same live onboarding from the deck.", name: "Casey N.", role: "Head of Customer Success, Series B", avatar: media.avatar6 },
         ]}
       />
 

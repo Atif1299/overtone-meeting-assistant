@@ -38,7 +38,9 @@ export default function PricingPage() {
         subtitle="Start free. Upgrade when you need more launches and uploads. No sales call required."
         primaryCta="Start free trial"
         primaryHref={`${dashboardUrl}/signup`}
-        imageSrc={media.heroDashboard}
+        composition="ledger"
+        compositionImages={[media.heroPricing]}
+        imageAlt="Usage bars and plan pill"
       />
 
       <PricingCards plans={plans} />
@@ -59,8 +61,8 @@ export default function PricingPage() {
       <TestimonialRow
         title="Teams upgrading when demo volume picks up"
         items={[
-          { quote: "We hit the free launch limit in week one. Starter paid for itself on the first extra demo we didn't have to staff.", name: "Sam T.", role: "Sales Ops, Series B" },
-          { quote: "Pro tier handles our weekly investor updates without thinking about quotas.", name: "Morgan L.", role: "CEO, Seed startup" },
+          { quote: "We hit the free launch limit in week one. Starter paid for itself on the first extra demo we didn't have to staff.", name: "Sam T.", role: "Sales Ops, Series B", avatar: media.avatar4 },
+          { quote: "Pro tier handles our weekly investor updates without thinking about quotas.", name: "Morgan L.", role: "CEO, Seed startup", avatar: media.avatar5 },
         ]}
       />
 
