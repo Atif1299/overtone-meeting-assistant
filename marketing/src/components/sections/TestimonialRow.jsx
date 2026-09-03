@@ -1,6 +1,30 @@
+import { Star } from "lucide-react";
 import { useScrollReveal } from "../../hooks/useScrollReveal.js";
 
-export default function TestimonialRow({ title, items }) {
+function TestimonialCard({ item, duplicate = false }) {
+  return (
+    <blockquote className={`testimonial card-glass${duplicate ? " testimonial-dup" : ""}`}>
+      <div className="testimonial-stars" aria-hidden="true">
+        {Array.from({ length: 5 }, (_, i) => (
+          <Star key={i} size={14} fill="currentColor" strokeWidth={0} />
+        ))}
+      </div>
+      <p className="quote">"{item.quote}"</p>
+      <footer>
+        {item.avatar ? (
+          <img src={item.avatar} alt="" className="testimonial-avatar" width={40} height={40} />
+        ) : null}
+        <span className="testimonial-who">
+          <strong>{item.name}</strong>
+          <span>{item.role}</span>
+          <span className="testimonial-verified">Verified operator</span>
+        </span>
+      </footer>
+    </blockquote>
+  );
+}
+
+export default function TestimonialRow({ title, items, marquee = false }) {
   const ref = useScrollReveal();
 
   return (
@@ -11,18 +35,24 @@ export default function TestimonialRow({ title, items }) {
           <p className="eyebrow">Social proof</p>
           <h2>{title}</h2>
         </div>
-        <div className="testimonial-grid">
-          {items.map((t) => (
-            <blockquote key={t.quote} className="testimonial card-glass card-hover">
-              <div className="testimonial-stars" aria-hidden="true">★★★★★</div>
-              <p className="quote">"{t.quote}"</p>
-              <footer>
-                <strong>{t.name}</strong>
-                <span>{t.role}</span>
-              </footer>
-            </blockquote>
-          ))}
-        </div>
+        {marquee ? (
+          <div className="testimonial-marquee">
+            <div className="testimonial-marquee-track">
+              {items.map((item) => (
+                <TestimonialCard key={item.name} item={item} />
+              ))}
+              {items.map((item) => (
+                <TestimonialCard key={`${item.name}-dup`} item={item} duplicate />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="testimonial-grid">
+            {items.map((item) => (
+              <TestimonialCard key={item.name} item={item} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

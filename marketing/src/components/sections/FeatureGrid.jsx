@@ -32,19 +32,21 @@ export default function FeatureGrid({ eyebrow, title, subtitle, items, columns =
           {items.map((item) => {
             const Icon = item.iconKey ? ICONS[item.iconKey] : null;
             return (
-              <article key={item.title} className="feature-card card-hover">
+              <article key={item.title} className={item.image ? "feature-card feature-card--media" : "feature-card"}>
                 {item.image ? (
                   <div className="feature-card__media">
-                    <img src={item.image} alt="" loading="lazy" />
+                    <img src={item.image} alt="" width={640} height={400} loading="lazy" />
                   </div>
                 ) : null}
                 <div className="feature-card__body">
-                  {Icon ? (
-                    <span className="feature-card__icon" aria-hidden="true">
-                      <Icon size={18} strokeWidth={2} />
-                    </span>
-                  ) : null}
-                  <h3>{item.title}</h3>
+                  <div className="feature-card__headline">
+                    {Icon ? (
+                      <span className="feature-card__icon" aria-hidden="true">
+                        <Icon size={18} strokeWidth={2} />
+                      </span>
+                    ) : null}
+                    <h3>{item.title}</h3>
+                  </div>
                   <p>{item.body}</p>
                 </div>
               </article>

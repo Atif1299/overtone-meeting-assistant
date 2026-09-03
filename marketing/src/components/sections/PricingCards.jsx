@@ -5,12 +5,12 @@ export default function PricingCards({ plans }) {
   const ref = useScrollReveal();
 
   return (
-    <section className="section section-pricing scroll-fade" ref={ref}>
-      <div className="section-mesh section-mesh--pricing" aria-hidden="true" />
+    <section className="section section-light section-elevated scroll-fade" ref={ref}>
+      <div className="section-mesh section-mesh--light" aria-hidden="true" />
       <div className="section-inner">
         <div className="pricing-grid">
           {plans.map((p) => (
-            <article key={p.name} className={`price-card card-glass card-hover${p.featured ? " featured" : ""}`}>
+            <article key={p.name} className={`price-card card-hover${p.featured ? " featured" : ""}`}>
               <h3>{p.name}</h3>
               <div className="price">
                 {p.price}

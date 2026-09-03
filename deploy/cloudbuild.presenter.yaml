@@ -6,8 +6,8 @@ substitutions:
   _SERVICE: overtone-v2-presenter
   _AR_REPOSITORY: overtone
   _IMAGE_NAME: overtone-v2-presenter
-  _VITE_API_BASE: https://REPLACE-WITH-V2-API.run.app
-  _VITE_WS_BASE: wss://REPLACE-WITH-V2-API.run.app
+  _VITE_API_BASE: https://overtone-v2-api-4idrhaffca-uc.a.run.app
+  _VITE_WS_BASE: wss://overtone-v2-api-4idrhaffca-uc.a.run.app
 
 steps:
   - name: gcr.io/cloud-builders/docker
