@@ -2,14 +2,15 @@ import { useEffect, useRef } from "react";
 
 export function useScrollReveal(options = {}) {
   const ref = useRef(null);
-  const { threshold = 0.08, rootMargin = "0px 0px -5% 0px" } = options;
+  const { threshold = 0, rootMargin = "0px" } = options;
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
 
+    el.classList.add("is-visible");
+
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      el.classList.add("is-visible");
       return undefined;
     }
 
@@ -17,7 +18,7 @@ export function useScrollReveal(options = {}) {
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
+            entry.target.classList.add("is-revealed");
             observer.unobserve(entry.target);
           }
         });
