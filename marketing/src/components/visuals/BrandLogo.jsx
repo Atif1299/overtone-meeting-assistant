@@ -1,14 +1,18 @@
-export default function BrandLogo({ brand, size = 28, className = "" }) {
+export default function BrandLogo({ brand, size = 28, className = "", compact = false }) {
   if (!brand) return null;
 
-  if (brand.type === "external") {
+  if (brand.type === "local" || brand.type === "external") {
+    const src =
+      compact && brand.iconSrc ? brand.iconSrc : brand.src;
+    const isWordmark = brand.variant === "wordmark" && !compact;
+
     return (
       <img
-        src={brand.src}
+        src={src}
         alt={brand.title}
-        width={size}
+        width={isWordmark ? undefined : size}
         height={size}
-        className={`brand-logo brand-logo--img ${className}`.trim()}
+        className={`brand-logo brand-logo--img${isWordmark ? " brand-logo--wordmark" : ""} ${className}`.trim()}
         loading="lazy"
         decoding="async"
       />

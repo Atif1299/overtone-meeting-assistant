@@ -11,7 +11,7 @@ export default function LogoBar({ title = "Works with the platforms your buyers 
       <div className="logo-bar-row">
         {integrations.map((item) => (
           <div key={item.id} className="logo-pill logo-pill--brand">
-            <BrandLogo brand={item} size={22} />
+            <BrandLogo brand={item} size={22} compact />
             <span>{item.label}</span>
           </div>
         ))}

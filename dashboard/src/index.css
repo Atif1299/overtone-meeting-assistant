@@ -1226,6 +1226,11 @@ code {
 
 .brand-logo--img { object-fit: contain; }
 
+.auth-shell__platform-tile .brand-logo--img {
+  width: 28px;
+  height: 28px;
+}
+
 @media (max-width: 900px) {
   .auth-shell__main { grid-template-columns: 1fr; gap: 2rem; }
   .auth-shell__visual { display: none; }

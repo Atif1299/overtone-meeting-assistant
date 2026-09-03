@@ -54,7 +54,7 @@ export default function AuthLayout({ children }) {
           <div className="auth-shell__platforms">
             {platformLogos.map((brand) => (
               <div key={brand.id} className="auth-shell__platform-tile" title={brand.label}>
-                <BrandLogo brand={brand} size={24} />
+                <BrandLogo brand={brand} size={24} compact />
               </div>
             ))}
           </div>

@@ -12,7 +12,7 @@ export default function IntegrationStrip({ title }) {
       <div className="integration-grid">
         {integrations.map((item) => (
           <div key={item.id} className="integration-tile">
-            <BrandLogo brand={item} size={32} />
+            <BrandLogo brand={item} size={32} compact />
             <span>{item.label}</span>
           </div>
         ))}
