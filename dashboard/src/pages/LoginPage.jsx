@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase.js";
+import { requireSupabase } from "../lib/supabase.js";
 import AuthLayout from "../components/AuthLayout.jsx";
 
 export default function LoginPage() {
@@ -15,7 +15,8 @@ export default function LoginPage() {
     setError("");
     setBusy(true);
     try {
-      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+      const client = requireSupabase();
+      const { error: err } = await client.auth.signInWithPassword({ email, password });
       if (err) throw err;
       navigate("/app");
     } catch (err) {

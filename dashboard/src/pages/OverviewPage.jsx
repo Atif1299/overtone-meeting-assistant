@@ -22,13 +22,21 @@ export default function OverviewPage() {
 
     async function load() {
       try {
-        const [healthData, presentationData] = await Promise.all([
+        const [healthResult, presentationResult] = await Promise.allSettled([
           apiGet("/health"),
           apiGet("/api/v1/presentations"),
         ]);
-        if (!cancelled) {
-          setHealth(healthData);
+        if (cancelled) return;
+        if (healthResult.status === "fulfilled") {
+          setHealth(healthResult.value);
+        }
+        if (presentationResult.status === "fulfilled") {
+          const presentationData = presentationResult.value;
           setPresentations(Array.isArray(presentationData) ? presentationData : []);
+        }
+        if (healthResult.status === "rejected" && presentationResult.status === "rejected") {
+          setError(String(healthResult.reason?.message || healthResult.reason));
+        } else {
           setError("");
         }
       } catch (err) {

@@ -60,7 +60,10 @@ def get_workspace_context(request: Request, db: Session = Depends(get_db)) -> Wo
     settings = get_settings()
     token = _extract_bearer(request)
 
-    if token and settings.supabase_jwt_secret:
+    if token and (
+        settings.supabase_jwt_secret
+        or (settings.supabase_url and settings.supabase_anon_key)
+    ):
         try:
             identity = decode_supabase_jwt(token)
         except HTTPException:

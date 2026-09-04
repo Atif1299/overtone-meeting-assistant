@@ -7,7 +7,7 @@ substitutions:
   _AR_REPOSITORY: overtone
   _IMAGE_NAME: overtone-v2-dashboard
   _VITE_API_BASE: https://overtone-v2-api-4idrhaffca-uc.a.run.app
-  _VITE_SUPABASE_URL: ""
+  _VITE_SUPABASE_URL: https://xqlcqdpfkrkykkdjloud.supabase.co
   _VITE_SUPABASE_ANON_KEY: ""
   _VITE_MARKETING_URL: https://overtone-marketing-4idrhaffca-uc.a.run.app
 
