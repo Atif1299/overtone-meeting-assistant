@@ -29,9 +29,9 @@ class Settings(BaseSettings):
     openai_realtime_model: str = "gpt-realtime"
     openai_realtime_voice: str = "alloy"
     openai_realtime_vad_threshold: float = 0.4
-    openai_realtime_vad_silence_ms: int = 600
-    openai_realtime_vad_prefix_padding_ms: int = 450
-    openai_realtime_interrupt_response: bool = False
+    openai_realtime_vad_silence_ms: int = 350
+    openai_realtime_vad_prefix_padding_ms: int = 200
+    openai_realtime_interrupt_response: bool = True
     indexer_llm_model: str = "gpt-4o"
 
     realtime_provider: Literal["auto", "openai", "gemini"] = "auto"

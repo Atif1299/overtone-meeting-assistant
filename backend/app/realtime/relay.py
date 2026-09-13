@@ -179,6 +179,7 @@ class RelayRuntime:
                                 "threshold": settings.openai_realtime_vad_threshold,
                                 "prefix_padding_ms": settings.openai_realtime_vad_prefix_padding_ms,
                                 "silence_duration_ms": settings.openai_realtime_vad_silence_ms,
+                                "interrupt_response": settings.openai_realtime_interrupt_response,
                             },
                         },
                     }
