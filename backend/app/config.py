@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_live_model: str = "gemini-2.5-flash-native-audio-preview-12-2025"
     gemini_live_voice: str = "Kore"
+    gemini_vad_silence_ms: int = 350
+    gemini_vad_prefix_padding_ms: int = 200
+    gemini_vad_start_sensitivity: str = "START_SENSITIVITY_HIGH"
+    gemini_vad_end_sensitivity: str = "END_SENSITIVITY_HIGH"
     indexer_provider: Literal["auto", "openai", "gemini"] = "auto"
     gemini_vision_model: str = "gemini-2.5-flash"
 

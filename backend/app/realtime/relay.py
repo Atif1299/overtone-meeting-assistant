@@ -279,6 +279,12 @@ class RelayRuntime:
     async def _run_gemini(self) -> None:
         settings = get_settings()
         client = genai.Client(api_key=settings.gemini_api_key)
+        start_sens = getattr(
+            types.StartSensitivity, settings.gemini_vad_start_sensitivity, types.StartSensitivity.START_SENSITIVITY_HIGH
+        )
+        end_sens = getattr(
+            types.EndSensitivity, settings.gemini_vad_end_sensitivity, types.EndSensitivity.END_SENSITIVITY_HIGH
+        )
         config = types.LiveConnectConfig(
             response_modalities=["AUDIO"],
             speech_config=types.SpeechConfig(
@@ -290,6 +296,16 @@ class RelayRuntime:
             system_instruction=self._instructions(),
             input_audio_transcription=types.AudioTranscriptionConfig(),
             output_audio_transcription=types.AudioTranscriptionConfig(),
+            realtime_input_config=types.RealtimeInputConfig(
+                automatic_activity_detection=types.AutomaticActivityDetection(
+                    disabled=False,
+                    start_of_speech_sensitivity=start_sens,
+                    end_of_speech_sensitivity=end_sens,
+                    prefix_padding_ms=settings.gemini_vad_prefix_padding_ms,
+                    silence_duration_ms=settings.gemini_vad_silence_ms,
+                ),
+                activity_handling=types.ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
+            ),
         )
         async with client.aio.live.connect(model=settings.gemini_live_model, config=config) as session:
             self._gemini_session = session
