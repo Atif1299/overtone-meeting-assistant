@@ -57,6 +57,13 @@ export default function IndexingProgress({
         </div>
       ) : null}
 
+      {info?.metadata_provider || info?.metadata_model ? (
+        <div className="helper-text">
+          Vision: {info.metadata_provider || "unknown"}
+          {info.metadata_model ? ` (${info.metadata_model})` : ""}
+        </div>
+      ) : null}
+
       {documentId ? (
         <div className="helper-text">
           Document filter key: <code>{documentId}</code>

@@ -46,7 +46,17 @@ async def run_index_job(presentation_id: str) -> None:
             store.update(presentation_id, status="failed", index_error="Missing source file")
             return
 
-        store.update(presentation_id, status="indexing", index_error=None)
+        provider = effective_indexer_provider()
+        settings = get_settings()
+        store.update(
+            presentation_id,
+            status="indexing",
+            index_error=None,
+            metadata_provider=provider,
+            metadata_model=(
+                settings.gemini_vision_model if provider == "gemini" else settings.indexer_llm_model
+            ),
+        )
         page_images = await convert_to_page_images(source, presentation_id)
         for i, path in enumerate(page_images, start=1):
             store.save_page_image(presentation_id, i, path)
@@ -54,9 +64,6 @@ async def run_index_job(presentation_id: str) -> None:
         if not page_images:
             store.update(presentation_id, status="failed", index_error="No page images produced")
             return
-
-        provider = effective_indexer_provider()
-        settings = get_settings()
         if provider == "openai" and not settings.openai_api_key:
             store.update(presentation_id, status="failed", index_error="OPENAI_API_KEY required for indexing")
             return
