@@ -2,6 +2,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RealtimeClient } from "@openai/realtime-api-beta";
 import { WavRecorder, WavStreamPlayer } from "wavtools";
 
+const BARGE_IN_RMS = 0.045;
+const BARGE_IN_HOLD_MS = 90;
+const ECHO_GUARD_MS = 150;
+const BARGE_IN_SPEAKING_GAIN = 1.6;
+
+function pcmRms(mono) {
+  if (!mono || !mono.length) return 0;
+  let sum = 0;
+  for (let i = 0; i < mono.length; i += 1) {
+    const sample = mono[i] / 32768;
+    sum += sample * sample;
+  }
+  return Math.sqrt(sum / mono.length);
+}
+
 export function useRealtimeAgent({
   enabled,
   sessionId,
@@ -19,6 +34,8 @@ export function useRealtimeAgent({
   const onStatusChangeRef = useRef(onStatusChange);
   const onErrorRef = useRef(onError);
   const isSpeakingRef = useRef(false);
+  const speakingStartedAtRef = useRef(0);
+  const bargeHoldStartRef = useRef(0);
 
   onAssistantTextRef.current = onAssistantText;
   onStatusChangeRef.current = onStatusChange;
@@ -32,6 +49,8 @@ export function useRealtimeAgent({
     recorderRef.current = null;
     playerRef.current = null;
     isSpeakingRef.current = false;
+    speakingStartedAtRef.current = 0;
+    bargeHoldStartRef.current = 0;
     try {
       if (recorder?.recording) await recorder.pause();
     } catch {
@@ -104,11 +123,16 @@ export function useRealtimeAgent({
           }
         }
         isSpeakingRef.current = false;
+        speakingStartedAtRef.current = 0;
+        bargeHoldStartRef.current = 0;
         onStatusChangeRef.current?.("listening");
       });
 
       client.on("conversation.updated", async ({ item, delta }) => {
         if (delta?.audio) {
+          if (!isSpeakingRef.current) {
+            speakingStartedAtRef.current = Date.now();
+          }
           isSpeakingRef.current = true;
           onStatusChangeRef.current?.("speaking");
           player.add16BitPCM(delta.audio, item.id);
@@ -125,6 +149,8 @@ export function useRealtimeAgent({
         }
         if (item?.status === "completed") {
           isSpeakingRef.current = false;
+          speakingStartedAtRef.current = 0;
+          bargeHoldStartRef.current = 0;
           onStatusChangeRef.current?.("listening");
         }
       });
@@ -144,6 +170,8 @@ export function useRealtimeAgent({
           /* ignore */
         }
         isSpeakingRef.current = false;
+        speakingStartedAtRef.current = 0;
+        bargeHoldStartRef.current = 0;
         onStatusChangeRef.current?.("listening");
       };
 
@@ -158,11 +186,34 @@ export function useRealtimeAgent({
           return;
         }
         if (type === "response.created" || type === "response.audio.delta") {
+          if (!isSpeakingRef.current) {
+            speakingStartedAtRef.current = Date.now();
+          }
+          isSpeakingRef.current = true;
           onStatusChangeRef.current?.("speaking");
         }
       });
       await client.connect();
-      await recorder.record((data) => client.appendInputAudio(data.mono));
+      await recorder.record((data) => {
+        const energy = pcmRms(data.mono);
+        if (isSpeakingRef.current) {
+          const sincePlay = Date.now() - speakingStartedAtRef.current;
+          const threshold = BARGE_IN_RMS * BARGE_IN_SPEAKING_GAIN;
+          if (sincePlay > ECHO_GUARD_MS && energy > threshold) {
+            if (!bargeHoldStartRef.current) {
+              bargeHoldStartRef.current = Date.now();
+            } else if (Date.now() - bargeHoldStartRef.current >= BARGE_IN_HOLD_MS) {
+              bargeHoldStartRef.current = 0;
+              void interruptPlayback();
+            }
+          } else {
+            bargeHoldStartRef.current = 0;
+          }
+        } else {
+          bargeHoldStartRef.current = 0;
+        }
+        client.appendInputAudio(data.mono);
+      });
 
       setRealtimeStatus("connected");
       onStatusChangeRef.current?.("listening");
