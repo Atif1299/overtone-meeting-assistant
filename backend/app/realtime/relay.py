@@ -78,6 +78,8 @@ class RelayRuntime:
         self._last_user_audio_at: float | None = None
         self._tool_ms: int | None = None
         self._first_audio_for_turn = False
+        self._tool_task: asyncio.Task | None = None
+        self._generation = 0
 
     def _session(self):
         return store.get(self._session_id)
@@ -140,6 +142,9 @@ class RelayRuntime:
 
     async def close(self) -> None:
         self._closed = True
+        self._generation += 1
+        if self._tool_task and not self._tool_task.done():
+            self._tool_task.cancel()
 
     def _instructions(self) -> str:
         db = SessionLocal()
@@ -392,13 +397,22 @@ class RelayRuntime:
                     if self._closed:
                         return
                     if getattr(chunk, "tool_call", None):
-                        await self._handle_gemini_tools(chunk.tool_call)
+                        gen = self._generation
+                        if self._tool_task and not self._tool_task.done():
+                            self._tool_task.cancel()
+                        self._tool_task = asyncio.create_task(
+                            self._handle_gemini_tools(chunk.tool_call, gen)
+                        )
                         continue
                     sc = getattr(chunk, "server_content", None)
                     if not sc:
                         continue
 
                     if getattr(sc, "interrupted", False):
+                        self._generation += 1
+                        if self._tool_task and not self._tool_task.done():
+                            self._tool_task.cancel()
+                        self._tool_task = None
                         self._reset_turn_clock()
                         speech_item = new_item_id()
                         await self._send_browser(
@@ -477,19 +491,27 @@ class RelayRuntime:
                 logger.exception("gemini receive error; retrying listen loop")
                 await asyncio.sleep(0.2)
 
-    async def _handle_gemini_tools(self, tool_call: Any) -> None:
+    async def _handle_gemini_tools(self, tool_call: Any, generation: int) -> None:
         assert self._gemini_session is not None
         responses = []
-        for fc in getattr(tool_call, "function_calls", None) or []:
-            name = getattr(fc, "name", "") or ""
-            args = parse_tool_args(getattr(fc, "args", None))
-            if self._muted() and name not in {"mute_self", "unmute_self"}:
-                result = {"ok": False, "reason": "muted"}
-            else:
-                started = time.monotonic()
-                result = await tools.execute(self._session_id, name, args)
-                self._tool_ms = int(round((time.monotonic() - started) * 1000))
-            responses.append(
-                types.FunctionResponse(id=getattr(fc, "id", None), name=name, response=result)
-            )
-        await self._gemini_session.send_tool_response(function_responses=responses)
+        try:
+            for fc in getattr(tool_call, "function_calls", None) or []:
+                if self._generation != generation:
+                    return
+                name = getattr(fc, "name", "") or ""
+                args = parse_tool_args(getattr(fc, "args", None))
+                if self._muted() and name not in {"mute_self", "unmute_self"}:
+                    result = {"ok": False, "reason": "muted"}
+                else:
+                    started = time.monotonic()
+                    result = await tools.execute(self._session_id, name, args)
+                    self._tool_ms = int(round((time.monotonic() - started) * 1000))
+                responses.append(
+                    types.FunctionResponse(id=getattr(fc, "id", None), name=name, response=result)
+                )
+            if self._generation != generation:
+                return
+            await self._gemini_session.send_tool_response(function_responses=responses)
+        except asyncio.CancelledError:
+            logger.info("gemini tools cancelled session_id=%s", self._session_id)
+            return
