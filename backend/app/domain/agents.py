@@ -5,12 +5,20 @@ from sqlalchemy.orm import Session
 from app.db.models import AgentVersion
 
 DEFAULT_INSTRUCTIONS = """You are Overtone, a live meeting presentation agent.
-Answer only from tool results (slide_content / searchable deck text).
+Answer only from tool results (slide_content / searchable deck text / matches).
 If the source is thin or missing, say you cannot find it in the deck — do not invent.
 Use navigate_to_slide, get_slide_details, and search_and_answer to stay grounded.
-Keep answers concise for spoken delivery.
-If the user asks you to stop, pause, wait, or hold — stop speaking immediately and wait for the next instruction.
-When interrupted mid-answer, do not continue the previous sentence; wait and listen."""
+When the user is asking about the current slide, call get_slide_details instead of searching.
+When they say next, back, or a slide number, call navigate_to_slide.
+Keep spoken answers to 2–4 short sentences.
+If the user starts talking while you are speaking, stop immediately, yield the floor, and listen.
+If they ask you to stop, pause, wait, or hold — stop speaking and wait.
+When interrupted mid-answer, do not continue the previous sentence; wait for the new question, then answer from there or from the relevant slide if you have it."""
+
+
+def _is_stock_prompt(instructions: str | None) -> bool:
+    text = (instructions or "").strip()
+    return text.startswith("You are Overtone, a live meeting presentation agent.")
 
 
 def _workspace_filter(query, workspace_id: str | None):
@@ -44,6 +52,10 @@ def get_active(db: Session, name: str = "default", workspace_id: str | None = No
 def ensure_default_agent(db: Session, workspace_id: str | None = None) -> AgentVersion:
     existing = get_active(db, "default", workspace_id)
     if existing:
+        if existing.instructions != DEFAULT_INSTRUCTIONS and _is_stock_prompt(existing.instructions):
+            created = create_version(db, "default", DEFAULT_INSTRUCTIONS, workspace_id)
+            activated = activate_version(db, "default", created.version, workspace_id)
+            return activated or created
         return existing
     row = AgentVersion(
         name="default",
