@@ -14,7 +14,7 @@ const homeFaq = [
   { q: "Does Overtone replace a human presenter entirely?", a: "Overtone handles scripted presentation flow and grounded Q&A from your deck. Many teams use it for first-pass demos, onboarding, and investor updates — with humans joining for negotiation or custom deep dives." },
   { q: "Which meeting platforms are supported?", a: "Google Meet, Zoom, and Microsoft Teams via Recall.ai bots. Paste the meeting URL in Launch and Overtone joins as the presenter camera." },
   { q: "How are answers kept on-deck?", a: "Every slide is indexed into pgvector. The voice agent uses search_and_answer and slide tools — responses come from uploaded content, not open-web knowledge." },
-  { q: "What's included in the free trial?", a: "1 deck upload and 1 bot launch per month. Full presenter experience, agent studio, and community support. No credit card on signup." },
+  { q: "What's included in the free trial?", a: "1 deck upload and 5 bot launches per month. Full presenter experience, agent studio, and community support. No credit card on signup." },
 ];
 
 export default function HomePage() {
@@ -66,17 +66,17 @@ export default function HomePage() {
         />
 
         <StepsTimeline
-        eyebrow="How it works"
-        title="Four steps from upload to live presentation"
-        ctaLabel="Full walkthrough →"
-        ctaTo="/how-it-works"
-        steps={[
-          { title: "Upload", body: "Ingest PPTX/PDF. Vision extracts per-slide metadata into pgvector.", image: media.stepUpload },
-          { title: "Launch", body: "Paste a meeting URL. Recall opens the presenter as bot camera.", image: media.stepLaunch },
-          { title: "Present", body: "Gemini Live speaks through the meeting with slide control tools.", image: media.stepPresent },
-          { title: "Answer", body: "Audience questions trigger grounded search — not generic chat.", image: media.stepAnswer },
-        ]}
-      />
+          eyebrow="How it works"
+          title="Four steps from upload to live presentation"
+          ctaLabel="Full walkthrough →"
+          ctaTo="/how-it-works"
+          steps={[
+            { title: "Upload", body: "Ingest PPTX/PDF. Vision extracts per-slide metadata into pgvector.", image: media.stepUpload },
+            { title: "Launch", body: "Paste a meeting URL. Recall opens the presenter as bot camera.", image: media.stepLaunch },
+            { title: "Present", body: "Gemini Live speaks through the meeting with slide control tools.", image: media.stepPresent },
+            { title: "Answer", body: "Audience questions trigger grounded search — not generic chat.", image: media.stepAnswer },
+          ]}
+        />
       </ToneBand>
 
       <TestimonialRow
@@ -103,7 +103,7 @@ export default function HomePage() {
 
       <CTABand
         title="Ready to present without a human in the loop?"
-        subtitle="Start free — 1 deck upload and 1 bot launch included. Upgrade when your demo volume grows."
+        subtitle="Start free — 1 deck upload and 5 bot launches included. Upgrade when your demo volume grows."
         primaryLabel="Start free trial"
         primaryHref={`${dashboardUrl}/signup`}
         secondaryLabel="See pricing"

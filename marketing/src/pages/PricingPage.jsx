@@ -9,7 +9,7 @@ import TestimonialRow from "../components/sections/TestimonialRow.jsx";
 import CTABand from "../components/sections/CTABand.jsx";
 
 const plans = [
-  { name: "Free trial", price: "$0", features: ["1 bot launch / month", "1 deck upload / month", "Full presenter experience", "Community support"], cta: "Start free" },
+  { name: "Free trial", price: "$0", features: ["5 bot launches / month", "1 deck upload / month", "Full presenter experience", "Community support"], cta: "Start free" },
   { name: "Starter", price: "$10", period: "/mo", features: ["5 bot launches / month", "3 deck uploads / month", "Agent prompt studio", "Email support"], cta: "Get Starter", plan: "starter" },
   { name: "Pro", price: "$20", period: "/mo", features: ["20 bot launches / month", "10 deck uploads / month", "Priority support", "Best for high-volume demos"], cta: "Get Pro", plan: "pro", featured: true },
 ];
@@ -68,7 +68,7 @@ export default function PricingPage() {
 
       <CTABand
         title="Start presenting for free today"
-        subtitle="1 launch and 1 upload included — no credit card on signup."
+        subtitle="5 launches and 1 upload included — no credit card on signup."
         primaryLabel="Create free account"
         primaryHref={`${dashboardUrl}/signup`}
         secondaryLabel="See use cases"

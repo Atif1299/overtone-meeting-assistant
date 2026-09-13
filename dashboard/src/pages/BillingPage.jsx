@@ -73,6 +73,9 @@ export default function BillingPage() {
       <p className="eyebrow">Billing</p>
       <h1>Plan &amp; usage</h1>
       <p className="lede">Current plan: <strong className="plan-pill">{plan}</strong></p>
+      {plan === "free" ? (
+        <p className="helper-text">Free trial includes 1 deck upload and 5 bot launches each month. No card required.</p>
+      ) : null}
 
       {usage ? (
         <div className="card billing-card">

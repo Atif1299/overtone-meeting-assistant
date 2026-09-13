@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase, supabaseConfigured } from "../lib/supabase.js";
-import { apiPost, setAuthTokenProvider } from "../utils/api.js";
+import { apiGet, apiPost, setAuthTokenProvider } from "../utils/api.js";
 
 const AuthContext = createContext(null);
 
@@ -28,8 +28,11 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
+      if (event === "PASSWORD_RECOVERY" && window.location.pathname !== "/reset-password") {
+        window.location.replace("/reset-password");
+      }
     });
 
     return () => sub.subscription.unsubscribe();
@@ -44,9 +47,7 @@ export function AuthProvider({ children }) {
     (async () => {
       try {
         await apiPost("/api/v1/auth/bootstrap", {});
-        const me = await (await fetch(`${import.meta.env.VITE_API_BASE || "http://127.0.0.1:8001"}/api/v1/me`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        })).json();
+        const me = await apiGet("/api/v1/me");
         if (!cancelled) setProfile(me);
       } catch {
         if (!cancelled) setProfile(null);

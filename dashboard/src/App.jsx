@@ -7,8 +7,12 @@ import AgentsPage from "./pages/AgentsPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import SignupPage from "./pages/SignupPage.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
+import AuthCallbackPage from "./pages/AuthCallbackPage.jsx";
 import BillingPage from "./pages/BillingPage.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import OvertoneMark from "./components/OvertoneMark.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
 
 const navItems = [
@@ -30,7 +34,9 @@ function DashboardShell() {
 
       <header className="topbar">
         <div className="brand">
-          <span className="brand-badge">▲</span>
+          <span className="brand-badge">
+            <OvertoneMark tone="light" size={30} decorative />
+          </span>
           <div>
             <p className="brand-title">Overtone</p>
             <p className="brand-subtitle">AI presentation operations studio</p>
@@ -91,6 +97,9 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/" element={<Navigate to="/app" replace />} />
       <Route
         path="/app/*"

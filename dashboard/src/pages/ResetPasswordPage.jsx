@@ -3,9 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { requireSupabase } from "../lib/supabase.js";
 import AuthLayout from "../components/AuthLayout.jsx";
 
-export default function LoginPage() {
+export default function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -16,11 +15,15 @@ export default function LoginPage() {
     setBusy(true);
     try {
       const client = requireSupabase();
-      const { error: err } = await client.auth.signInWithPassword({ email, password });
+      const { data } = await client.auth.getSession();
+      if (!data.session) {
+        throw new Error("That reset link expired. Request a new one.");
+      }
+      const { error: err } = await client.auth.updateUser({ password });
       if (err) throw err;
-      navigate("/app");
+      navigate("/app", { replace: true });
     } catch (err) {
-      setError(err.message || "Sign in failed");
+      setError(err.message || "Could not update password");
     } finally {
       setBusy(false);
     }
@@ -29,27 +32,20 @@ export default function LoginPage() {
   return (
     <AuthLayout>
       <div className="auth-card">
-        <h1>Sign in to Overtone</h1>
-        <p className="auth-sub">Upload decks, launch bots, and present live in meetings.</p>
+        <h1>Choose a new password</h1>
+        <p className="auth-sub">Then you’ll enter your free-trial dashboard.</p>
         <form onSubmit={onSubmit} className="auth-form">
           <label>
-            Email
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </label>
-          <label>
-            Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            New password
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
           <button type="submit" className="button button-primary auth-submit" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"}
+            {busy ? "Saving…" : "Save password"}
           </button>
         </form>
         <p className="auth-foot">
-          <Link to="/forgot-password">Forgot password?</Link>
-        </p>
-        <p className="auth-foot">
-          No account? <Link to="/signup">Start free trial</Link>
+          <Link to="/forgot-password">Request a new link</Link>
         </p>
       </div>
     </AuthLayout>

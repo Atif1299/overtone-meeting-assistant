@@ -100,13 +100,13 @@ export default function OverviewPage() {
           </p>
         </div>
         <div className="button-row quick-actions-grid">
-          <Link to="/presentations" className="button button-primary">
+          <Link to="/app/presentations" className="button button-primary">
             Knowledge base
           </Link>
-          <Link to="/launch" className="button button-secondary">
+          <Link to="/app/launch" className="button button-secondary">
             Launch meeting bot
           </Link>
-          <Link to="/session" className="button button-ghost">
+          <Link to="/app/session" className="button button-ghost">
             Monitor session
           </Link>
         </div>

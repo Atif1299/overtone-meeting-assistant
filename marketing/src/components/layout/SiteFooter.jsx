@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { dashboardUrl } from "../../config.js";
 import BrandLogo from "../visuals/BrandLogo.jsx";
+import OvertoneMark from "../visuals/OvertoneMark.jsx";
 import { integrations } from "../visuals/integrations.js";
 
 const columns = [
@@ -40,7 +41,12 @@ export default function SiteFooter() {
       <p className="footer-watermark" aria-hidden="true">Overtone</p>
       <div className="footer-main">
         <div className="footer-brand">
-          <p className="footer-logo"><span className="logo-mark">▲</span> Overtone</p>
+          <p className="footer-logo">
+            <span className="logo-mark">
+              <OvertoneMark tone="dark" size={28} decorative />
+            </span>
+            Overtone
+          </p>
           <p className="footer-tagline">Upload a deck. Join the call. Present and answer.</p>
           <div className="footer-marks">
             {footerPlatforms.map((brand) => (

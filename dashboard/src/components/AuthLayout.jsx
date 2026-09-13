@@ -2,12 +2,13 @@ import { Link, useLocation } from "react-router-dom";
 import { Check } from "lucide-react";
 import { marketingUrl, marketingNav } from "../config.js";
 import BrandLogo from "./BrandLogo.jsx";
+import OvertoneMark from "./OvertoneMark.jsx";
 import { integrations } from "./integrations.js";
 
 const highlights = [
   "Deck-grounded Q&A in Meet, Zoom, Teams",
   "Recall bot joins as your presenter",
-  "Free trial — 1 upload, 1 launch",
+  "Free trial — 1 upload, 5 launches",
 ];
 
 const platformLogos = integrations.filter((i) =>
@@ -22,7 +23,10 @@ export default function AuthLayout({ children }) {
     <div className="auth-shell">
       <header className="auth-shell__header">
         <a href={marketingUrl} className="auth-shell__logo">
-          <span className="auth-shell__mark">▲</span> Overtone
+          <span className="auth-shell__mark">
+            <OvertoneMark tone="dark" size={28} decorative />
+          </span>
+          Overtone
         </a>
         <nav className="auth-shell__nav" aria-label="Marketing">
           {marketingNav.map((item) => (

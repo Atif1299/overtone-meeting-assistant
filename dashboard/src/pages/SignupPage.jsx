@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { requireSupabase } from "../lib/supabase.js";
+import { authRedirectTo } from "../lib/authRedirect.js";
 import AuthLayout from "../components/AuthLayout.jsx";
 
 export default function SignupPage() {
@@ -9,29 +10,32 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
-    setNotice("");
     setBusy(true);
     try {
       const client = requireSupabase();
       const { data, error: err } = await client.auth.signUp({
         email,
         password,
-        options: { data: { full_name: name } },
+        options: { data: { full_name: name }, emailRedirectTo: authRedirectTo() },
       });
       if (err) throw err;
+      const alreadyRegistered = Array.isArray(data.user?.identities) && data.user.identities.length === 0;
       if (!data.session) {
         const { data: signedIn, error: signInErr } = await client.auth.signInWithPassword({
           email,
           password,
         });
         if (signInErr || !signedIn.session) {
-          setNotice("Account created. Check your email to confirm, then sign in.");
+          if (alreadyRegistered || signInErr?.code === "invalid_credentials") {
+            setError("This email already has an account. Sign in, or use Forgot password.");
+            return;
+          }
+          setError(signInErr?.message || "Could not start your trial. Try signing in.");
           return;
         }
       }
@@ -47,7 +51,7 @@ export default function SignupPage() {
     <AuthLayout>
       <div className="auth-card">
         <h1>Start your free trial</h1>
-        <p className="auth-sub">1 deck upload and 1 bot launch included — no credit card required.</p>
+        <p className="auth-sub">1 deck upload and 5 bot launches included — no credit card required.</p>
         <form onSubmit={onSubmit} className="auth-form">
           <label>
             Name
@@ -62,7 +66,6 @@ export default function SignupPage() {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
           </label>
           {error ? <p className="auth-error">{error}</p> : null}
-          {notice ? <p className="auth-notice">{notice}</p> : null}
           <button type="submit" className="button button-primary auth-submit" disabled={busy}>
             {busy ? "Creating account…" : "Create account"}
           </button>

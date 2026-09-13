@@ -86,19 +86,10 @@ a
 
 .brand-badge
 {
-  width: 1.85rem;
-  height: 1.85rem;
-  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: #111111;
-  background: #ffffff;
-  border: 1px solid #d4d4d4;
-  box-shadow: none;
+  line-height: 0;
 }
 
 .brand-title
@@ -1181,7 +1172,9 @@ code
 
 .auth-shell__mark
 {
-  color: #38bdf8;
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
 }
 
 .auth-shell__nav
