@@ -5,9 +5,11 @@ from typing import Any
 
 from app.db import SessionLocal
 from app.domain.session_store import store
-from app.indexing.embeddings import generate_embedding, last_embed_ms
+from app.indexing import embeddings as embedding_mod
+from app.indexing.embeddings import generate_embedding
 from app.indexing.vector_store import hybrid_search
 from app.meetings.recall import RecallClient
+from app.realtime.turn_routing import is_current_slide_query, parse_nav_command
 from app.realtime.ws_hub import hub
 from app.storage import PresentationStore
 
@@ -157,7 +159,19 @@ class ToolExecutor:
 
     async def _search(self, sess, args: dict) -> dict:
         q = args.get("search_query") or args.get("user_question") or ""
-        hits = await hybrid_search(sess.presentation_id, q, generate_embedding, top_k=3)
+        question = args.get("user_question") or q
+        if is_current_slide_query(q, question):
+            return await self._details(sess, {})
+        current = int((sess.extra or {}).get("current_page") or 1)
+        nav = parse_nav_command(q, question, current_page=current)
+        if nav:
+            return await self._navigate(sess, nav)
+
+        async def _hot_embed(text: str):
+            return await generate_embedding(text, hot=True)
+
+        hits = await hybrid_search(sess.presentation_id, q, _hot_embed, top_k=3)
+        store.merge_extra(sess.session_id, last_embed_ms=embedding_mod.last_embed_ms)
         if not hits:
             db = SessionLocal()
             try:
