@@ -85,3 +85,77 @@ async def test_search_broadcasts_target_page():
     payload = broadcast.await_args.args[1]
     assert payload["type"] == "navigate"
     assert payload["target_page"] == 3
+
+
+@pytest.mark.asyncio
+async def test_search_stays_on_current_slide():
+    session_id = _make_session()
+    store.merge_extra(session_id, current_page=3)
+    broadcast = AsyncMock()
+    hit = {
+        "page_number": 3,
+        "title": "Slide 3",
+        "searchable_content": "same slide",
+        "score": 0.9,
+    }
+
+    with (
+        patch("app.realtime.tools.hub.broadcast", broadcast),
+        patch("app.realtime.tools.hybrid_search", AsyncMock(return_value=[hit])),
+    ):
+        result = await tools.execute(
+            session_id,
+            "search_and_answer",
+            {"user_question": "What is VisionsCraft?", "search_query": "VisionsCraft"},
+        )
+
+    assert result["target_page"] == 3
+    assert result["navigated"] is False
+    broadcast.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_search_abstains_on_weak_score():
+    session_id = _make_session()
+    broadcast = AsyncMock()
+    hit = {
+        "page_number": 8,
+        "title": "Unrelated",
+        "searchable_content": "noise",
+        "score": 0.18,
+    }
+
+    with (
+        patch("app.realtime.tools.hub.broadcast", broadcast),
+        patch("app.realtime.tools.hybrid_search", AsyncMock(return_value=[hit])),
+    ):
+        result = await tools.execute(
+            session_id,
+            "search_and_answer",
+            {"user_question": "What is the moon made of?", "search_query": "moon cheese"},
+        )
+
+    assert result["slide_content"] == ""
+    broadcast.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_search_current_slide_skips_embed():
+    session_id = _make_session()
+    details = AsyncMock(return_value={"ok": True, "page_number": 1, "slide_content": "here"})
+    search = AsyncMock(return_value=[])
+
+    with (
+        patch.object(tools, "_details", details),
+        patch("app.realtime.tools.hybrid_search", search),
+    ):
+        result = await tools.execute(
+            session_id,
+            "search_and_answer",
+            {"user_question": "what does that mean on this slide", "search_query": "this slide"},
+        )
+
+    details.assert_awaited_once()
+    search.assert_not_awaited()
+    assert result["page_number"] == 1
+
