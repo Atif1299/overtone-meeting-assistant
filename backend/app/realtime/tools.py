@@ -9,6 +9,7 @@ from app.indexing import embeddings as embedding_mod
 from app.indexing.embeddings import generate_embedding
 from app.indexing.vector_store import hybrid_search
 from app.meetings.recall import RecallClient
+from app.realtime.retrieval import choose_hit, keyword_hits, match_payloads
 from app.realtime.turn_routing import is_current_slide_query, parse_nav_command
 from app.realtime.ws_hub import hub
 from app.storage import PresentationStore
@@ -178,45 +179,34 @@ class ToolExecutor:
                 pages = PresentationStore(db).load_index_pages(sess.presentation_id)
             finally:
                 db.close()
-            ql = q.lower()
-            scored = []
-            for p in pages:
-                text = (p.get("searchable_content") or "").lower()
-                score = 1.0 if ql and ql in text else 0.1
-                scored.append((score, p))
-            scored.sort(key=lambda x: x[0], reverse=True)
-            hits = [
-                {
-                    "page_number": p.get("page_number"),
-                    "title": p.get("title"),
-                    "searchable_content": p.get("searchable_content"),
-                    "score": s,
-                }
-                for s, p in scored[:3]
-            ]
+            hits = keyword_hits(pages, q, top_k=3)
 
-        if not hits or float(hits[0].get("score") or 0) < 0.15:
+        best = choose_hit(hits, current)
+        if not best:
             return {
                 "ok": True,
                 "slide_content": "",
+                "matches": match_payloads(hits),
                 "instruction": "No grounded match. Say you cannot find it in the deck. Do not invent.",
             }
 
-        best = hits[0]
         page = int(best.get("page_number") or 1)
-        await hub.broadcast(
-            sess.session_id,
-            {"type": "navigate", "target_page": page, "page_number": page},
-        )
-        store.merge_extra(sess.session_id, current_page=page)
+        stayed = page == current
+        if not stayed:
+            await hub.broadcast(
+                sess.session_id,
+                {"type": "navigate", "target_page": page, "page_number": page},
+            )
+            store.merge_extra(sess.session_id, current_page=page)
         content = best.get("searchable_content") or best.get("content") or ""
         return {
             "ok": True,
             "target_page": page,
             "page_number": page,
-            "navigated": True,
+            "navigated": not stayed,
             "slide_content": content,
-            "instruction": "Answer only from slide_content.",
+            "matches": match_payloads(hits),
+            "instruction": "Answer only from slide_content and matches. Do not invent.",
         }
 
     async def _mute(self, sess, _args: dict) -> dict:
