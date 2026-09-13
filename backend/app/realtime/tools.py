@@ -5,7 +5,7 @@ from typing import Any
 
 from app.db import SessionLocal
 from app.domain.session_store import store
-from app.indexing.embeddings import generate_embedding
+from app.indexing.embeddings import generate_embedding, last_embed_ms
 from app.indexing.vector_store import hybrid_search
 from app.meetings.recall import RecallClient
 from app.realtime.ws_hub import hub
