@@ -5,7 +5,7 @@ from app.domain.plans import limits_for_plan
 
 def test_plan_limits():
     free = limits_for_plan("free")
-    assert free.launches == 1
+    assert free.launches == 5
     assert free.uploads == 1
     starter = limits_for_plan("starter")
     assert starter.launches == 5

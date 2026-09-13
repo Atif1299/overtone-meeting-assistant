@@ -10,7 +10,7 @@ class PlanLimits:
 
 
 PLAN_LIMITS: dict[str, PlanLimits] = {
-    "free": PlanLimits(launches=1, uploads=1),
+    "free": PlanLimits(launches=5, uploads=1),
     "starter": PlanLimits(launches=5, uploads=3),
     "pro": PlanLimits(launches=20, uploads=10),
 }
