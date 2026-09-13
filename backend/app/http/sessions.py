@@ -50,6 +50,8 @@ class SessionOut(BaseModel):
     last_status_code: str | None = None
     last_status_message: str | None = None
     extra: dict = Field(default_factory=dict)
+    first_audio_latency_ms: float | None = None
+    latency_breakdown: dict | None = None
 
 
 @router.post("/launch", response_model=LaunchOut)
@@ -140,6 +142,7 @@ def get_session(
     if not sess:
         raise HTTPException(status_code=404, detail="Session not found")
     assert_session_access(ctx, sess.customer_id)
+    extra = sess.extra or {}
     return SessionOut(
         session_id=sess.session_id,
         presentation_id=sess.presentation_id,
@@ -151,7 +154,9 @@ def get_session(
         recall_bot_id=sess.recall_bot_id,
         last_status_code=sess.last_status_code,
         last_status_message=sess.last_status_message,
-        extra=sess.extra or {},
+        extra=extra,
+        first_audio_latency_ms=extra.get("first_audio_latency_ms"),
+        latency_breakdown=extra.get("latency_breakdown"),
     )
 
 

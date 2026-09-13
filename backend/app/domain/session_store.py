@@ -11,7 +11,13 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.db.models import Session as SessionRow, SessionState
 
-DURABLE_KEYS = ("session_greeting_sent", "muted", "current_page")
+DURABLE_KEYS = (
+    "session_greeting_sent",
+    "muted",
+    "current_page",
+    "first_audio_latency_ms",
+    "latency_breakdown",
+)
 
 
 @dataclass

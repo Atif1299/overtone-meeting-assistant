@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import logging
+import time
 from typing import Any
 
 import websockets
@@ -74,6 +74,10 @@ class RelayRuntime:
         self._provider = provider
         self._gemini_session = None
         self._closed = False
+        self._listen_started = time.monotonic()
+        self._last_user_audio_at: float | None = None
+        self._tool_ms: int | None = None
+        self._first_audio_for_turn = False
 
     def _session(self):
         return store.get(self._session_id)
@@ -89,6 +93,44 @@ class RelayRuntime:
 
     async def _set_state(self, **fields) -> None:
         store.merge_extra(self._session_id, **fields)
+
+    def _reset_turn_clock(self) -> None:
+        self._listen_started = time.monotonic()
+        self._last_user_audio_at = None
+        self._tool_ms = None
+        self._first_audio_for_turn = False
+
+    def _note_user_audio(self) -> None:
+        self._last_user_audio_at = time.monotonic()
+
+    async def _note_first_audio(self) -> None:
+        if self._first_audio_for_turn:
+            return
+        self._first_audio_for_turn = True
+        now = time.monotonic()
+        if self._last_user_audio_at is not None:
+            first_ms = int(round((now - self._last_user_audio_at) * 1000))
+        else:
+            first_ms = int(round((now - self._listen_started) * 1000))
+        endpointing_ms = None
+        if self._last_user_audio_at is not None:
+            gap_ms = int(round((now - self._last_user_audio_at) * 1000))
+            endpointing_ms = max(0, gap_ms - int(self._tool_ms or 0))
+        sess = self._session()
+        embed_ms = (sess.extra or {}).get("last_embed_ms") if sess else None
+        breakdown = {
+            "endpointing_ms": endpointing_ms,
+            "embed_ms": embed_ms,
+            "tool_ms": self._tool_ms,
+            "first_audio_ms": first_ms,
+        }
+        logger.info(
+            "first_audio session_id=%s latency_ms=%s breakdown=%s",
+            self._session_id,
+            first_ms,
+            breakdown,
+        )
+        await self._set_state(first_audio_latency_ms=first_ms, latency_breakdown=breakdown)
 
     async def run(self) -> None:
         if self._provider == "gemini":
@@ -181,6 +223,8 @@ class RelayRuntime:
             except json.JSONDecodeError:
                 continue
             et = event.get("type")
+            if et == "input_audio_buffer.append":
+                self._note_user_audio()
             if et in {"input_audio_buffer.append", "input_audio_buffer.commit"} and self._muted():
                 continue
             if et == "response.create" or et.startswith("conversation.item"):
@@ -203,6 +247,10 @@ class RelayRuntime:
                     continue
             if self._muted() and event.get("type", "").startswith("response.audio"):
                 continue
+            if event.get("type") == "response.audio.delta":
+                await self._note_first_audio()
+            if event.get("type") in {"response.done", "response.cancelled", "conversation.interrupted"}:
+                self._reset_turn_clock()
             await self._send_browser(event)
 
     async def _handle_openai_tool(self, oai, item: dict) -> None:
@@ -211,7 +259,9 @@ class RelayRuntime:
         if self._muted() and name not in {"mute_self", "unmute_self"}:
             result = {"ok": False, "reason": "muted"}
         else:
+            started = time.monotonic()
             result = await tools.execute(self._session_id, name, item.get("arguments"))
+            self._tool_ms = int(round((time.monotonic() - started) * 1000))
         await oai.send(
             json.dumps(
                 {
@@ -285,6 +335,7 @@ class RelayRuntime:
                 continue
             et = event.get("type")
             if et == "input_audio_buffer.append":
+                self._note_user_audio()
                 if self._muted():
                     continue
                 pcm24 = decode_browser_pcm_b64(event.get("audio") or "")
@@ -332,6 +383,7 @@ class RelayRuntime:
                         continue
 
                     if getattr(sc, "interrupted", False):
+                        self._reset_turn_clock()
                         speech_item = new_item_id()
                         await self._send_browser(
                             {
@@ -361,6 +413,7 @@ class RelayRuntime:
                                     pcm = decode_browser_pcm_b64(pcm)
                                 pcm24 = resample_pcm16_mono(pcm, 24000, 24000)
                                 rid, iid = await ensure_turn()
+                                await self._note_first_audio()
                                 await self._send_browser(
                                     presenter_audio_delta_event(
                                         item_id=iid,
@@ -384,6 +437,7 @@ class RelayRuntime:
                             )
 
                     if getattr(sc, "turn_complete", False):
+                        self._reset_turn_clock()
                         if turn_started and response_id and item_id:
                             for ev in presenter_turn_end_events(
                                 response_id=response_id, item_id=item_id
@@ -416,7 +470,9 @@ class RelayRuntime:
             if self._muted() and name not in {"mute_self", "unmute_self"}:
                 result = {"ok": False, "reason": "muted"}
             else:
+                started = time.monotonic()
                 result = await tools.execute(self._session_id, name, args)
+                self._tool_ms = int(round((time.monotonic() - started) * 1000))
             responses.append(
                 types.FunctionResponse(id=getattr(fc, "id", None), name=name, response=result)
             )
