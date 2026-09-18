@@ -18,7 +18,7 @@ const capabilities = [
 ];
 
 const featuresFaq = [
-  { q: "Can I use my existing sales deck?", a: "Yes. Upload PPTX or PDF — Overtone indexes every slide and uses that content for live Q&A." },
+  { q: "Can I use my existing sales deck?", a: "Yes. Upload PPTX or PDF — DeckVoice indexes every slide and uses that content for live Q&A." },
   { q: "Does the bot appear as a separate app?", a: "No. Recall carries your presenter webpage as the bot's camera output — participants see your slides and hear the voice agent." },
   { q: "Can I customize the agent's tone?", a: "Yes. The Agent studio lets you version prompt instructions per workspace." },
 ];
@@ -42,7 +42,7 @@ export default function FeaturesPage() {
       <FeatureGrid
         eyebrow="Capabilities"
         title="Core platform features"
-        subtitle="Six pillars that make Overtone a complete presentation agent — not a chatbot with slides pasted in."
+        subtitle="Six pillars that make DeckVoice a complete presentation agent — not a chatbot with slides pasted in."
         items={capabilities}
       />
 
@@ -59,7 +59,7 @@ export default function FeaturesPage() {
       <SplitFeature
         eyebrow="Deep dive"
         title="Launch & join — Recall carries your presenter as the bot camera"
-        body="Paste a Google Meet, Zoom, or Teams URL. Overtone creates a Recall bot, opens the presenter webpage as output media, and connects the realtime voice relay."
+        body="Paste a Google Meet, Zoom, or Teams URL. DeckVoice creates a Recall bot, opens the presenter webpage as output media, and connects the realtime voice relay."
         bullets={["No separate app in the meeting", "Webhook-driven session lifecycle", "Signed presenter URLs for security"]}
         imageSrc={media.fragLaunch}
         imageAlt="Meeting URL and connect bot field"

@@ -18,7 +18,7 @@ export default function UseCasesPage() {
     <>
       <HeroSection
         badge="Use cases"
-        title="Where Overtone wins — live meetings that need your deck, not a chatbot"
+        title="Where DeckVoice wins — live meetings that need your deck, not a chatbot"
         subtitle="Sales demos, investor updates, customer onboarding, and any scenario where slides and voice matter."
         primaryCta="Start free trial"
         primaryHref={`${dashboardUrl}/signup`}
@@ -36,8 +36,8 @@ export default function UseCasesPage() {
 
       <SplitFeature
         eyebrow="Scenario"
-        title="The investor asks about slide 9 — Overtone navigates and answers"
-        body="In a live fundraise call, an investor jumps to unit economics on a slide you didn't plan to cover. Overtone receives the question, navigates to the right slide, searches indexed content, and responds in natural voice — grounded in what you uploaded."
+        title="The investor asks about slide 9 — DeckVoice navigates and answers"
+        body="In a live fundraise call, an investor jumps to unit economics on a slide you didn't plan to cover. DeckVoice receives the question, navigates to the right slide, searches indexed content, and responds in natural voice — grounded in what you uploaded."
         bullets={["No 'let me get back to you on that'", "Slide navigation on audience demand", "Consistent messaging across every call"]}
         imageSrc={media.stepAnswer}
         imageAlt="Spoken answer grounded in the deck"
@@ -47,7 +47,7 @@ export default function UseCasesPage() {
       <TestimonialRow
         title="Operators who run the same meeting on repeat"
         items={[
-          { quote: "We stopped scheduling three engineers for every sales call. Overtone runs the deck and stays on-message.", name: "Alex R.", role: "Head of Sales, B2B SaaS", avatar: media.avatar1 },
+          { quote: "We stopped scheduling three engineers for every sales call. DeckVoice runs the deck and stays on-message.", name: "Alex R.", role: "Head of Sales, B2B SaaS", avatar: media.avatar1 },
           { quote: "Customer onboarding used to mean the same 45-minute walkthrough. Now we launch a bot with the playbook deck.", name: "Jordan K.", role: "CS Lead, Series A", avatar: media.avatar3 },
           { quote: "Playbook walkthroughs no longer wait on my calendar. Every new account gets the same live onboarding from the deck.", name: "Casey N.", role: "Head of Customer Success, Series B", avatar: media.avatar6 },
         ]}

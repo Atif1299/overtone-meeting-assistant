@@ -28,7 +28,7 @@
   <text x="780" y="220" fill="#f472b6" font-size="22" font-weight="700">Live</text>
   <rect x="320" y="320" width="780" height="260" fill="#111827" stroke="url(#accent)" stroke-width="2" rx="12"/>
   <text x="350" y="370" fill="#f1f5f9" font-family="system-ui,sans-serif" font-size="18" font-weight="600">Launch meeting bot</text>
-  <text x="350" y="410" fill="#94a3b8" font-size="14">Paste Meet / Zoom / Teams URL ’ Overtone joins as presenter</text>
+  <text x="350" y="410" fill="#94a3b8" font-size="14">Paste Meet / Zoom / Teams URL ’ DeckVoice joins as presenter</text>
   <rect x="350" y="440" width="180" height="44" fill="url(#accent)" rx="22"/>
   <text x="395" y="468" fill="#041018" font-size="14" font-weight="700">Launch bot</text>
 </svg>

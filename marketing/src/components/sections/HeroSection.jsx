@@ -126,7 +126,7 @@ export default function HeroSection({
   secondaryCta,
   secondaryHref,
   imageSrc,
-  imageAlt = "Overtone product preview",
+  imageAlt = "DeckVoice product preview",
   visual,
   overlay = false,
   overlayImages,

@@ -30,7 +30,7 @@ export default function HowItWorksPage() {
 
         <StepsTimeline
           eyebrow="Step by step"
-          title="The Overtone presentation loop"
+          title="The DeckVoice presentation loop"
           steps={[
             { title: "Upload your deck", body: "Dashboard ingests PPTX/PDF. Vision extracts per-slide content. pgvector stores searchable chunks.", image: media.stepUpload },
             { title: "Wait for indexing", body: "Status moves from uploaded → indexing → ready. Large decks process in the background.", image: media.fragIngest },
@@ -62,7 +62,7 @@ export default function HowItWorksPage() {
 
       <CTABand
         title="Try the full loop — free"
-        subtitle="Upload a deck, launch a bot, and see Overtone present live."
+        subtitle="Upload a deck, launch a bot, and see DeckVoice present live."
         primaryLabel="Start free trial"
         primaryHref={`${dashboardUrl}/signup`}
         secondaryLabel="Explore features"

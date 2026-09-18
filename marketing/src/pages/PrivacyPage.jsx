@@ -10,7 +10,7 @@ export default function PrivacyPage() {
       <section className="legal-section">
         <h2>Overview</h2>
         <p>
-          Overtone ("we", "our", "us") operates an AI meeting presentation platform. This policy describes how we collect, use, and protect information when you use our services.
+          DeckVoice ("we", "our", "us") operates an AI meeting presentation platform. This policy describes how we collect, use, and protect information when you use our services.
         </p>
       </section>
 
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
 
       <section className="legal-section">
         <h2>Contact</h2>
-        <p>For privacy requests, contact your workspace administrator or Overtone support through the dashboard.</p>
+        <p>For privacy requests, contact your workspace administrator or DeckVoice support through the dashboard.</p>
       </section>
     </article>
   );

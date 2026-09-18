@@ -23,7 +23,7 @@ const compareRows = [
 ];
 
 const faq = [
-  { q: "What counts as a bot launch?", a: "Each time you click Launch and Overtone creates a new Recall bot for a meeting URL, that counts as one launch for the billing period." },
+  { q: "What counts as a bot launch?", a: "Each time you click Launch and DeckVoice creates a new Recall bot for a meeting URL, that counts as one launch for the billing period." },
   { q: "What counts as a deck upload?", a: "Each new PPTX or PDF you upload to your workspace counts as one upload, regardless of slide count." },
   { q: "Can I upgrade mid-month?", a: "Yes. Upgrade through the billing page — Stripe prorates your subscription automatically." },
   { q: "Is there a contract or lock-in?", a: "No. Cancel anytime from the Stripe customer portal. Your workspace data remains until you delete it." },

@@ -11,8 +11,8 @@ import CTABand from "../components/sections/CTABand.jsx";
 import ToneBand from "../components/sections/ToneBand.jsx";
 
 const homeFaq = [
-  { q: "Does Overtone replace a human presenter entirely?", a: "Overtone handles scripted presentation flow and grounded Q&A from your deck. Many teams use it for first-pass demos, onboarding, and investor updates — with humans joining for negotiation or custom deep dives." },
-  { q: "Which meeting platforms are supported?", a: "Google Meet, Zoom, and Microsoft Teams via Recall.ai bots. Paste the meeting URL in Launch and Overtone joins as the presenter camera." },
+  { q: "Does DeckVoice replace a human presenter entirely?", a: "DeckVoice handles scripted presentation flow and grounded Q&A from your deck. Many teams use it for first-pass demos, onboarding, and investor updates — with humans joining for negotiation or custom deep dives." },
+  { q: "Which meeting platforms are supported?", a: "Google Meet, Zoom, and Microsoft Teams via Recall.ai bots. Paste the meeting URL in Launch and DeckVoice joins as the presenter camera." },
   { q: "How are answers kept on-deck?", a: "Every slide is indexed into pgvector. The voice agent uses search_and_answer and slide tools — responses come from uploaded content, not open-web knowledge." },
   { q: "What's included in the free trial?", a: "1 deck upload and 5 bot launches per month. Full presenter experience, agent studio, and community support. No credit card on signup." },
 ];
@@ -22,16 +22,16 @@ export default function HomePage() {
     <>
       <ToneBand tone="dark" glow>
         <HeroSection
-          badge="AI presentation agent for live meetings"
-          title="Your deck. Your meeting. Overtone presents and answers live."
-          subtitle="Upload slides, paste a Meet / Zoom / Teams link, and let Overtone join as a presenter — navigating your deck and answering questions grounded in your content."
+          badge="Live AI presentation agent"
+          title="Upload your deck. Paste the meeting link. DeckVoice joins, presents, and answers from the slides — not generic chat."
+          subtitle="AI that presents your deck live in Meet, Zoom, or Teams"
           primaryCta="Start free trial"
           primaryHref={`${dashboardUrl}/signup`}
           secondaryCta="See how it works"
           secondaryHref="/how-it-works"
           overlay
           overlayImages={[media.heroHome, media.fragLaunch, media.fragSession]}
-          imageAlt="Overtone product fragments — overview, launch, and live session"
+          imageAlt="DeckVoice product fragments — overview, launch, and live session"
         />
 
         <LogoBar />
@@ -53,7 +53,7 @@ export default function HomePage() {
         <SplitFeature
           eyebrow="Product spotlight"
           title="A presenter that joins the call, shows your slides, and speaks with context"
-          body="Overtone indexes your PPTX or PDF, launches a Recall.ai bot into the meeting, and drives a realtime voice agent that navigates slides and answers from indexed content."
+          body="DeckVoice indexes your PPTX or PDF, launches a Recall.ai bot into the meeting, and drives a realtime voice agent that navigates slides and answers from indexed content."
           bullets={[
             "Deck-grounded Q&A via search_and_answer tools",
             "Gemini Live speech-to-speech with natural pacing",
@@ -83,7 +83,7 @@ export default function HomePage() {
         title="Built for teams who can't afford to wing live demos"
         marquee
         items={[
-          { quote: "We stopped scheduling three engineers for every sales call. Overtone runs the deck and stays on-message.", name: "Alex R.", role: "Head of Sales, B2B SaaS", avatar: media.avatar1 },
+          { quote: "We stopped scheduling three engineers for every sales call. DeckVoice runs the deck and stays on-message.", name: "Alex R.", role: "Head of Sales, B2B SaaS", avatar: media.avatar1 },
           { quote: "Investors asked about unit economics on slide 9 — it navigated there and answered from our actual deck.", name: "Priya M.", role: "Founder, Seed-stage startup", avatar: media.avatar2 },
           { quote: "Customer onboarding used to mean the same 45-minute walkthrough. Now we launch a bot with the playbook deck.", name: "Jordan K.", role: "CS Lead, Series A", avatar: media.avatar3 },
           { quote: "Playbook walkthroughs no longer wait on my calendar. Every new account gets the same live onboarding from the deck.", name: "Casey N.", role: "Head of Customer Success, Series B", avatar: media.avatar6 },
