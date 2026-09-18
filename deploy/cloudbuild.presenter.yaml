@@ -1,13 +1,13 @@
-# Cloud Build: Overtone V2 presenter (Recall output-media)
+# Cloud Build: DeckVoice presenter (Recall output-media)
 
 substitutions:
   _REGION: us-central1
   _RUN_REGION: us-central1
-  _SERVICE: overtone-v2-presenter
+  _SERVICE: deckvoice-v2-presenter
   _AR_REPOSITORY: overtone
-  _IMAGE_NAME: overtone-v2-presenter
-  _VITE_API_BASE: https://overtone-v2-api-4idrhaffca-uc.a.run.app
-  _VITE_WS_BASE: wss://overtone-v2-api-4idrhaffca-uc.a.run.app
+  _IMAGE_NAME: deckvoice-v2-presenter
+  _VITE_API_BASE: https://deckvoice-v2-api-4idrhaffca-uc.a.run.app
+  _VITE_WS_BASE: wss://deckvoice-v2-api-4idrhaffca-uc.a.run.app
 
 steps:
   - name: gcr.io/cloud-builders/docker

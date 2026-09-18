@@ -1,12 +1,12 @@
-# Cloud Build: Overtone marketing site
+# Cloud Build: DeckVoice marketing site
 
 substitutions:
   _REGION: us-central1
   _RUN_REGION: us-central1
-  _SERVICE: overtone-marketing
+  _SERVICE: deckvoice-marketing
   _AR_REPOSITORY: overtone
-  _IMAGE_NAME: overtone-marketing
-  _VITE_DASHBOARD_URL: https://overtone-v2-dashboard-4idrhaffca-uc.a.run.app
+  _IMAGE_NAME: deckvoice-marketing
+  _VITE_DASHBOARD_URL: https://deckvoice-v2-dashboard-4idrhaffca-uc.a.run.app
 
 steps:
   - name: gcr.io/cloud-builders/docker

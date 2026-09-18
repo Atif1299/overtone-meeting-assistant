@@ -1,8 +1,8 @@
 $ErrorActionPreference = 'Continue'
-$API = "https://overtone-v2-api-4idrhaffca-uc.a.run.app"
-$PRESENTER = "https://overtone-v2-presenter-4idrhaffca-uc.a.run.app"
-$DASHBOARD = "https://overtone-v2-dashboard-4idrhaffca-uc.a.run.app"
-$adminKey = ((gcloud run services describe overtone-backend --region=us-central1 --format=json | ConvertFrom-Json).spec.template.spec.containers[0].env | Where-Object { $_.name -eq 'ADMIN_API_KEY' }).value
+$API = "https://deckvoice-v2-api-4idrhaffca-uc.a.run.app"
+$PRESENTER = "https://deckvoice-v2-presenter-4idrhaffca-uc.a.run.app"
+$DASHBOARD = "https://deckvoice-v2-dashboard-4idrhaffca-uc.a.run.app"
+$adminKey = ((gcloud run services describe deckvoice-v2-api --region=us-central1 --format=json | ConvertFrom-Json).spec.template.spec.containers[0].env | Where-Object { $_.name -eq 'ADMIN_API_KEY' }).value
 $H = @{ "X-API-Key" = $adminKey }
 $results = New-Object System.Collections.Generic.List[object]
 
@@ -108,7 +108,7 @@ if ($presentationId) {
 
     $meet = 'https://meet.google.com/aaa-bbbb-ccc'
     try {
-      $launchBody = @{ meeting_url = $meet; presentation_id = $presentationId; bot_name = 'OvertoneV2Test'; agent_name = 'default' } | ConvertTo-Json
+      $launchBody = @{ meeting_url = $meet; presentation_id = $presentationId; bot_name = 'DeckVoiceV2Test'; agent_name = 'default' } | ConvertTo-Json
       $launch = Invoke-RestMethod -Method POST "$API/api/v1/sessions/launch" -Headers $H -ContentType 'application/json' -Body $launchBody
       Add-Result 'session_launch' ($null -ne $launch.session_id) ("session=$($launch.session_id) bot=$($launch.recall_bot_id) state=$($launch.state)")
       $sid = $launch.session_id
