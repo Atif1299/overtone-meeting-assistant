@@ -8,7 +8,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from app.config import get_settings
 from app.domain.session_store import store
 
-logger = logging.getLogger("overtone.v2.webhooks")
+logger = logging.getLogger("deckvoice.v2.webhooks")
 router = APIRouter(prefix="/webhooks/recall", tags=["webhooks"])
 
 

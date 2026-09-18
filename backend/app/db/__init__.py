@@ -11,7 +11,7 @@ class Base(DeclarativeBase):
 
 
 settings = get_settings()
-DATABASE_URL = settings.database_url or "sqlite:///./overtone_v2.db"
+DATABASE_URL = settings.database_url or "sqlite:///./deckvoice_v2.db"
 
 engine = create_engine(
     DATABASE_URL,

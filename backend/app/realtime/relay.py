@@ -32,7 +32,7 @@ from app.realtime.gemini_live import (
 from app.realtime.tools import REALTIME_TOOLS, tools
 from app.realtime.ws_hub import hub
 
-logger = logging.getLogger("overtone.v2.realtime")
+logger = logging.getLogger("deckvoice.v2.realtime")
 router = APIRouter()
 
 

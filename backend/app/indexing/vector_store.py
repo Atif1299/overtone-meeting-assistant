@@ -67,7 +67,7 @@ def ensure_chunks_table_safe() -> None:
     except Exception as exc:  # noqa: BLE001
         import logging
 
-        logging.getLogger("overtone.v2.db").exception("ensure_chunks_table failed: %s", exc)
+        logging.getLogger("deckvoice.v2.db").exception("ensure_chunks_table failed: %s", exc)
 
 
 def delete_document_chunks(document_id: str) -> None:

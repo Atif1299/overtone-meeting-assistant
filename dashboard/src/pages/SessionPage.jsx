@@ -23,7 +23,7 @@ export default function SessionPage() {
   const [params] = useSearchParams();
   const qSid = params.get("sid");
   const [sessionId, setSessionId] = useState(
-    qSid || sessionStorage.getItem("overtone_session_id") || ""
+    qSid || sessionStorage.getItem("deckvoice_session_id") || ""
   );
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");

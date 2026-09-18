@@ -18,7 +18,7 @@ target_metadata = Base.metadata
 
 def get_url() -> str:
     settings = get_settings()
-    return settings.database_url or "sqlite:///./overtone_v2.db"
+    return settings.database_url or "sqlite:///./deckvoice_v2.db"
 
 
 def run_migrations_offline() -> None:

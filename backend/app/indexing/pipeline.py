@@ -10,7 +10,7 @@ from app.indexing.vector_store import upsert_pages
 from app.indexing.vision import extract_all_pages, is_stub_page
 from app.storage import PresentationStore
 
-logger = logging.getLogger("overtone.v2.indexing")
+logger = logging.getLogger("deckvoice.v2.indexing")
 
 
 def _normalize_page(raw: dict) -> dict | None:

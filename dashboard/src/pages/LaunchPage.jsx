@@ -6,7 +6,7 @@ import { apiGet, apiPost } from "../utils/api.js";
 export default function LaunchPage() {
   const nav = useNavigate();
   const [cfg, setCfg] = useState({
-    bot_name: "Overtone Agent",
+    bot_name: "DeckVoice Agent",
     meeting_url: "",
     presentation_id: "",
     agent_name: "default",
@@ -67,8 +67,8 @@ export default function LaunchPage() {
         agent_name: cfg.agent_name || "default",
       });
       setResult(r);
-      sessionStorage.setItem("overtone_session_id", r.session_id);
-      sessionStorage.setItem("overtone_presentation_id", r.presentation_id);
+      sessionStorage.setItem("deckvoice_session_id", r.session_id);
+      sessionStorage.setItem("deckvoice_presentation_id", r.presentation_id);
     } catch (e) {
       setErr(String(e.message || e));
     } finally {
