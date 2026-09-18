@@ -29,7 +29,7 @@ export default function LoginPage() {
   return (
     <AuthLayout>
       <div className="auth-card">
-        <h1>Sign in to Overtone</h1>
+        <h1>Sign in to DeckVoice</h1>
         <p className="auth-sub">Upload decks, launch bots, and present live in meetings.</p>
         <form onSubmit={onSubmit} className="auth-form">
           <label>

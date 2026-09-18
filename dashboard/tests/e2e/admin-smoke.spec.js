@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("VoiceNav admin dashboard", () => {
+test.describe("DeckVoice admin dashboard", () => {
   test("loads overview metrics", async ({ page }) => {
     await page.route("http://127.0.0.1:8000/health", async (route) => {
       await route.fulfill({
@@ -40,7 +40,7 @@ test.describe("VoiceNav admin dashboard", () => {
             active_presentation_id: "demo",
             updated_at: "2026-01-01T12:00:00Z",
             version_count: 1,
-            prompt_preview: "You are VoiceNav.",
+            prompt_preview: "You are DeckVoice.",
           },
         ]),
       });
@@ -94,7 +94,7 @@ test.describe("VoiceNav admin dashboard", () => {
             active_presentation_id: "demo",
             updated_at: "2026-01-01T12:00:00Z",
             version_count: 1,
-            prompt_preview: "You are VoiceNav.",
+            prompt_preview: "You are DeckVoice.",
           },
         ]),
       });
@@ -157,7 +157,7 @@ test.describe("VoiceNav admin dashboard", () => {
           session_id: "sid-123",
           presentation_id: "demo",
           bot_id: "bot-123",
-          bot_name: "VoiceNav Presenter",
+          bot_name: "DeckVoice Presenter",
           meeting_url: "https://teams.microsoft.com/l/meetup-join/example",
           agent_mode: "realtime",
           agent_name: "default",
