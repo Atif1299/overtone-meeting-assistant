@@ -35,7 +35,7 @@ export default function App() {
     el.muted = false;
     el.volume = 1;
     el.play().catch((err) => {
-      console.warn("Overtone audio playback failed", err);
+      console.warn("DeckVoice audio playback failed", err);
     });
   }, []);
 
@@ -172,7 +172,7 @@ export default function App() {
     return (
       <div className="stage stage-empty">
         <div className="empty-panel">
-          <p className="empty-eyebrow">Overtone Output Media</p>
+          <p className="empty-eyebrow">DeckVoice Output Media</p>
           <h1>Session parameter missing</h1>
           <p>Open this page from the Launch flow so session and presentation params are set.</p>
         </div>
