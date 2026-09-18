@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 from datetime import datetime, timezone
 
-import stripe
-from fastapi import APIRouter, Depends, HTTPException, Request
+import httpx
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -22,6 +24,12 @@ class CheckoutIn(BaseModel):
 
 class CheckoutOut(BaseModel):
     url: str
+    transaction_id: str | None = None
+
+
+class PaddleConfigOut(BaseModel):
+    client_token: str
+    environment: str
 
 
 class PortalOut(BaseModel):
@@ -35,25 +43,61 @@ class UsageOut(BaseModel):
     uploads: dict
 
 
-def _stripe():
+def paddle_environment(api_base: str) -> str:
+    return "sandbox" if "sandbox" in (api_base or "").lower() else "live"
+
+
+def _paddle_configured() -> None:
     settings = get_settings()
-    if not settings.stripe_secret_key:
-        raise HTTPException(status_code=503, detail="Stripe not configured")
-    stripe.api_key = settings.stripe_secret_key
-    return stripe
+    if not settings.paddle_api_key:
+        raise HTTPException(status_code=503, detail="Paddle not configured")
 
 
 def _price_for_plan(plan: str) -> str:
     settings = get_settings()
     if plan == "starter":
-        if not settings.stripe_price_starter:
-            raise HTTPException(status_code=503, detail="Stripe starter price not configured")
-        return settings.stripe_price_starter
+        if not settings.paddle_price_starter:
+            raise HTTPException(status_code=503, detail="Paddle starter price not configured")
+        return settings.paddle_price_starter
     if plan == "pro":
-        if not settings.stripe_price_pro:
-            raise HTTPException(status_code=503, detail="Stripe pro price not configured")
-        return settings.stripe_price_pro
+        if not settings.paddle_price_pro:
+            raise HTTPException(status_code=503, detail="Paddle pro price not configured")
+        return settings.paddle_price_pro
     raise HTTPException(status_code=400, detail="Invalid plan")
+
+
+def _paddle_headers() -> dict[str, str]:
+    settings = get_settings()
+    return {
+        "Authorization": f"Bearer {settings.paddle_api_key}",
+        "Content-Type": "application/json",
+        "Paddle-Version": "1",
+    }
+
+
+def _paddle_post(path: str, payload: dict | None = None) -> dict:
+    _paddle_configured()
+    settings = get_settings()
+    url = f"{settings.paddle_api_base.rstrip('/')}{path}"
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(url, headers=_paddle_headers(), json=payload or {})
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Paddle request failed") from exc
+    if response.status_code >= 400:
+        detail = "Paddle request failed"
+        try:
+            body = response.json()
+            err = body.get("error") or {}
+            if isinstance(err, dict) and err.get("detail"):
+                detail = str(err["detail"])
+        except Exception:  # noqa: BLE001
+            pass
+        raise HTTPException(status_code=502, detail=detail)
+    try:
+        return response.json()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail="Paddle request failed") from exc
 
 
 def _get_or_create_subscription(db: Session, workspace_id: str) -> Subscription:
@@ -70,6 +114,89 @@ def _get_or_create_subscription(db: Session, workspace_id: str) -> Subscription:
     db.commit()
     db.refresh(sub)
     return sub
+
+
+def verify_paddle_signature(raw_body: bytes | str, signature_header: str, secret: str) -> bool:
+    if not signature_header or not secret:
+        return False
+    ts = ""
+    signatures: list[str] = []
+    for part in signature_header.split(";"):
+        piece = part.strip()
+        if piece.startswith("ts="):
+            ts = piece[3:]
+        elif piece.startswith("h1="):
+            signatures.append(piece[3:])
+    if not ts or not signatures:
+        return False
+    body_text = raw_body.decode("utf-8") if isinstance(raw_body, (bytes, bytearray)) else raw_body
+    signed = f"{ts}:{body_text}"
+    expected = hmac.new(secret.encode("utf-8"), signed.encode("utf-8"), hashlib.sha256).hexdigest()
+    return any(hmac.compare_digest(sig, expected) for sig in signatures if len(sig) == len(expected))
+
+
+def _price_ids_from_items(items: list) -> list[str]:
+    ids: list[str] = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        price_id = item.get("price_id")
+        price = item.get("price")
+        if not price_id and isinstance(price, dict):
+            price_id = price.get("id")
+        if price_id:
+            ids.append(str(price_id))
+    return ids
+
+
+def plan_from_paddle_payload(data: dict, *, starter_price: str, pro_price: str) -> str:
+    for price_id in _price_ids_from_items(data.get("items") or []):
+        if pro_price and price_id == pro_price:
+            return "pro"
+        if starter_price and price_id == starter_price:
+            return "starter"
+    custom = data.get("custom_data") or {}
+    if isinstance(custom, dict):
+        plan = custom.get("plan")
+        if plan in ("starter", "pro", "free"):
+            return plan
+    return "free"
+
+
+def _parse_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _workspace_id_from_data(db: Session, data: dict) -> str | None:
+    custom = data.get("custom_data") or {}
+    if isinstance(custom, dict) and custom.get("workspace_id"):
+        return str(custom["workspace_id"])
+    subscription_id = data.get("subscription_id") or (
+        data.get("id") if str(data.get("id") or "").startswith("sub_") else None
+    )
+    if subscription_id:
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.paddle_subscription_id == subscription_id)
+            .first()
+        )
+        if sub:
+            return sub.workspace_id
+    customer_id = data.get("customer_id")
+    if customer_id:
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.paddle_customer_id == customer_id)
+            .first()
+        )
+        if sub:
+            return sub.workspace_id
+    return None
 
 
 @router.get("/usage", response_model=UsageOut)
@@ -96,31 +223,42 @@ def create_checkout(
 ):
     if ctx.is_operator:
         raise HTTPException(status_code=400, detail="Operator accounts do not need billing")
-    settings = get_settings()
-    st = _stripe()
+    if body.plan not in ("starter", "pro"):
+        raise HTTPException(status_code=400, detail="Invalid plan")
     sub = _get_or_create_subscription(db, ctx.workspace_id)
+    current = (sub.plan or "free").lower()
+    if current == body.plan:
+        raise HTTPException(status_code=400, detail=f"Already on {body.plan}")
+    if current == "pro" and body.plan == "starter":
+        raise HTTPException(status_code=400, detail="Use Manage subscription to change plan")
     price_id = _price_for_plan(body.plan)
+    payload: dict = {
+        "items": [{"price_id": price_id, "quantity": 1}],
+        "custom_data": {"workspace_id": ctx.workspace_id, "plan": body.plan},
+        "collection_mode": "automatic",
+    }
+    if sub.paddle_customer_id:
+        payload["customer_id"] = sub.paddle_customer_id
+    elif ctx.email:
+        payload["customer"] = {"email": ctx.email}
+    result = _paddle_post("/transactions", payload)
+    data = result.get("data") or {}
+    checkout = data.get("checkout") or {}
+    url = checkout.get("url")
+    if not url:
+        raise HTTPException(status_code=502, detail="Paddle checkout URL missing")
+    return CheckoutOut(url=url, transaction_id=data.get("id"))
 
-    customer_id = sub.stripe_customer_id
-    if not customer_id:
-        customer = st.Customer.create(
-            email=ctx.email or None,
-            metadata={"workspace_id": ctx.workspace_id, "user_id": ctx.user_id or ""},
-        )
-        customer_id = customer["id"]
-        sub.stripe_customer_id = customer_id
-        db.commit()
 
-    session = st.checkout.Session.create(
-        mode="subscription",
-        customer=customer_id,
-        line_items=[{"price": price_id, "quantity": 1}],
-        success_url=f"{settings.dashboard_url.rstrip('/')}/app/billing?checkout=success",
-        cancel_url=f"{settings.dashboard_url.rstrip('/')}/app/billing?checkout=cancel",
-        metadata={"workspace_id": ctx.workspace_id, "plan": body.plan},
-        subscription_data={"metadata": {"workspace_id": ctx.workspace_id, "plan": body.plan}},
+@router.get("/paddle-config", response_model=PaddleConfigOut)
+def paddle_config(ctx: WorkspaceContext = Depends(get_workspace_context)):
+    settings = get_settings()
+    if not settings.paddle_client_token:
+        raise HTTPException(status_code=503, detail="Paddle client token not configured")
+    return PaddleConfigOut(
+        client_token=settings.paddle_client_token,
+        environment=paddle_environment(settings.paddle_api_base),
     )
-    return CheckoutOut(url=session["url"])
 
 
 @router.post("/portal", response_model=PortalOut)
@@ -130,89 +268,82 @@ def customer_portal(
 ):
     if ctx.is_operator:
         raise HTTPException(status_code=400, detail="Operator accounts do not need billing")
-    settings = get_settings()
-    st = _stripe()
     sub = _get_or_create_subscription(db, ctx.workspace_id)
-    if not sub.stripe_customer_id:
-        raise HTTPException(status_code=400, detail="No Stripe customer — subscribe first")
-    portal = st.billing_portal.Session.create(
-        customer=sub.stripe_customer_id,
-        return_url=f"{settings.dashboard_url.rstrip('/')}/app/billing",
-    )
-    return PortalOut(url=portal["url"])
+    if not sub.paddle_customer_id:
+        raise HTTPException(status_code=400, detail="No Paddle customer — subscribe first")
+    path = f"/customers/{sub.paddle_customer_id}/portal-sessions"
+    body: dict = {}
+    if sub.paddle_subscription_id:
+        body["subscription_ids"] = [sub.paddle_subscription_id]
+    result = _paddle_post(path, body)
+    data = result.get("data") or {}
+    urls = data.get("urls") or {}
+    general = urls.get("general") or {}
+    url = general.get("overview")
+    if not url:
+        raise HTTPException(status_code=502, detail="Paddle portal URL missing")
+    return PortalOut(url=url)
 
 
-def _plan_from_stripe_subscription(stripe_sub: dict) -> str:
-    meta = stripe_sub.get("metadata") or {}
-    plan = meta.get("plan")
-    if plan in ("starter", "pro", "free"):
-        return plan
-    items = stripe_sub.get("items", {}).get("data") or []
-    if items:
-        price_id = items[0].get("price", {}).get("id", "")
-        settings = get_settings()
-        if price_id == settings.stripe_price_pro:
-            return "pro"
-        if price_id == settings.stripe_price_starter:
-            return "starter"
-    return "free"
-
-
-def handle_stripe_webhook(db: Session, event: dict) -> None:
-    event_type = event.get("type", "")
-    data = event.get("data", {}).get("object", {})
-
-    if event_type == "checkout.session.completed":
-        workspace_id = (data.get("metadata") or {}).get("workspace_id")
-        plan = (data.get("metadata") or {}).get("plan", "starter")
-        customer_id = data.get("customer")
-        subscription_id = data.get("subscription")
-        if workspace_id:
-            sub = _get_or_create_subscription(db, workspace_id)
-            sub.plan = plan
-            sub.status = "active"
-            sub.stripe_customer_id = customer_id
-            sub.stripe_subscription_id = subscription_id
-            db.commit()
+def handle_paddle_webhook(db: Session, event: dict) -> None:
+    event_type = event.get("event_type") or ""
+    data = event.get("data") or {}
+    if not isinstance(data, dict):
         return
+    settings = get_settings()
 
-    if event_type in ("customer.subscription.updated", "customer.subscription.created"):
-        workspace_id = (data.get("metadata") or {}).get("workspace_id")
+    if event_type == "transaction.completed":
+        workspace_id = _workspace_id_from_data(db, data)
         if not workspace_id:
-            customer_id = data.get("customer")
-            sub = (
-                db.query(Subscription)
-                .filter(Subscription.stripe_customer_id == customer_id)
-                .first()
-            )
-            if sub:
-                workspace_id = sub.workspace_id
-        if workspace_id:
-            sub = _get_or_create_subscription(db, workspace_id)
-            sub.plan = _plan_from_stripe_subscription(data)
-            sub.status = data.get("status", "active")
-            sub.stripe_subscription_id = data.get("id")
-            sub.stripe_customer_id = data.get("customer")
-            if data.get("current_period_start"):
-                sub.current_period_start = datetime.fromtimestamp(
-                    data["current_period_start"], tz=timezone.utc
-                )
-            if data.get("current_period_end"):
-                sub.current_period_end = datetime.fromtimestamp(
-                    data["current_period_end"], tz=timezone.utc
-                )
-            db.commit()
+            return
+        sub = _get_or_create_subscription(db, workspace_id)
+        sub.plan = plan_from_paddle_payload(
+            data,
+            starter_price=settings.paddle_price_starter,
+            pro_price=settings.paddle_price_pro,
+        )
+        sub.status = "active"
+        if data.get("customer_id"):
+            sub.paddle_customer_id = data["customer_id"]
+        if data.get("subscription_id"):
+            sub.paddle_subscription_id = data["subscription_id"]
+        db.commit()
         return
 
-    if event_type == "customer.subscription.deleted":
-        customer_id = data.get("customer")
-        sub = (
-            db.query(Subscription)
-            .filter(Subscription.stripe_customer_id == customer_id)
-            .first()
+    if event_type in (
+        "subscription.created",
+        "subscription.updated",
+        "subscription.past_due",
+        "subscription.canceled",
+    ):
+        workspace_id = _workspace_id_from_data(db, data)
+        if not workspace_id:
+            return
+        sub = _get_or_create_subscription(db, workspace_id)
+        status = data.get("status") or (
+            "canceled" if event_type == "subscription.canceled" else "active"
         )
-        if sub:
+        if event_type == "subscription.canceled" or status == "canceled":
             sub.plan = "free"
             sub.status = "canceled"
-            sub.stripe_subscription_id = None
-            db.commit()
+            sub.paddle_subscription_id = None
+        else:
+            sub.plan = plan_from_paddle_payload(
+                data,
+                starter_price=settings.paddle_price_starter,
+                pro_price=settings.paddle_price_pro,
+            )
+            sub.status = status
+            if data.get("id"):
+                sub.paddle_subscription_id = data["id"]
+        if data.get("customer_id"):
+            sub.paddle_customer_id = data["customer_id"]
+        period = data.get("current_billing_period") or {}
+        if isinstance(period, dict):
+            start = _parse_dt(period.get("starts_at"))
+            end = _parse_dt(period.get("ends_at"))
+            if start:
+                sub.current_period_start = start
+            if end:
+                sub.current_period_end = end
+        db.commit()

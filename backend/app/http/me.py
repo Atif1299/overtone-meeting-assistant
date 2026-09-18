@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import stripe
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -10,7 +11,7 @@ from app.db import get_db
 from app.domain.usage import usage_snapshot
 from app.domain.workspaces import bootstrap_user_workspace
 from app.http.auth import WorkspaceContext, get_workspace_context
-from app.http.billing import handle_stripe_webhook
+from app.http.billing import handle_paddle_webhook, verify_paddle_signature
 
 router = APIRouter(tags=["me"])
 
@@ -84,18 +85,18 @@ def auth_bootstrap(
     return BootstrapOut(ok=True, workspace_id=workspace.id)
 
 
-@router.post("/webhooks/stripe")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+@router.post("/webhooks/paddle")
+async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
     settings = get_settings()
-    if not settings.stripe_webhook_secret:
-        raise HTTPException(status_code=503, detail="Stripe webhook not configured")
+    if not settings.paddle_webhook_secret:
+        raise HTTPException(status_code=503, detail="Paddle webhook not configured")
     payload = await request.body()
-    sig = request.headers.get("stripe-signature", "")
+    sig = request.headers.get("paddle-signature", "")
+    if not verify_paddle_signature(payload, sig, settings.paddle_webhook_secret):
+        raise HTTPException(status_code=400, detail="Invalid Paddle signature")
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig, settings.stripe_webhook_secret
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    handle_stripe_webhook(db, event)
+        event = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON") from exc
+    handle_paddle_webhook(db, event)
     return {"ok": True}
