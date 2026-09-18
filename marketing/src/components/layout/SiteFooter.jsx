@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { dashboardUrl } from "../../config.js";
 import BrandLogo from "../visuals/BrandLogo.jsx";
-import OvertoneMark from "../visuals/OvertoneMark.jsx";
+import DeckVoiceMark from "../visuals/DeckVoiceMark.jsx";
 import { integrations } from "../visuals/integrations.js";
 
 const columns = [
@@ -38,16 +38,16 @@ const footerPlatforms = integrations.filter((i) =>
 export default function SiteFooter() {
   return (
     <footer className="site-footer">
-      <p className="footer-watermark" aria-hidden="true">Overtone</p>
+      <p className="footer-watermark" aria-hidden="true">DeckVoice</p>
       <div className="footer-main">
         <div className="footer-brand">
           <p className="footer-logo">
             <span className="logo-mark">
-              <OvertoneMark tone="dark" size={28} decorative />
+              <DeckVoiceMark tone="dark" size={28} decorative />
             </span>
-            Overtone
+            DeckVoice
           </p>
-          <p className="footer-tagline">Upload a deck. Join the call. Present and answer.</p>
+          <p className="footer-tagline">AI that presents your deck live in Meet, Zoom, or Teams</p>
           <div className="footer-marks">
             {footerPlatforms.map((brand) => (
               <span key={brand.id} className="footer-mark" title={brand.label}>
@@ -76,7 +76,7 @@ export default function SiteFooter() {
         </div>
       </div>
       <div className="footer-bottom">
-        <p>© {new Date().getFullYear()} Overtone. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} DeckVoice. All rights reserved.</p>
       </div>
     </footer>
   );

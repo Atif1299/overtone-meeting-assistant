@@ -12,7 +12,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import AuthCallbackPage from "./pages/AuthCallbackPage.jsx";
 import BillingPage from "./pages/BillingPage.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import OvertoneMark from "./components/OvertoneMark.jsx";
+import DeckVoiceMark from "./components/DeckVoiceMark.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
 
 const navItems = [
@@ -35,10 +35,10 @@ function DashboardShell() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-badge">
-            <OvertoneMark tone="light" size={30} decorative />
+            <DeckVoiceMark tone="light" size={30} decorative />
           </span>
           <div>
-            <p className="brand-title">Overtone</p>
+            <p className="brand-title">DeckVoice</p>
             <p className="brand-subtitle">AI presentation operations studio</p>
           </div>
         </div>

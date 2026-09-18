@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Check } from "lucide-react";
 import { marketingUrl, marketingNav } from "../config.js";
 import BrandLogo from "./BrandLogo.jsx";
-import OvertoneMark from "./OvertoneMark.jsx";
+import DeckVoiceMark from "./DeckVoiceMark.jsx";
 import { integrations } from "./integrations.js";
 
 const highlights = [
@@ -24,9 +24,9 @@ export default function AuthLayout({ children }) {
       <header className="auth-shell__header">
         <a href={marketingUrl} className="auth-shell__logo">
           <span className="auth-shell__mark">
-            <OvertoneMark tone="dark" size={28} decorative />
+            <DeckVoiceMark tone="dark" size={28} decorative />
           </span>
-          Overtone
+          DeckVoice
         </a>
         <nav className="auth-shell__nav" aria-label="Marketing">
           {marketingNav.map((item) => (
@@ -67,7 +67,7 @@ export default function AuthLayout({ children }) {
       </main>
 
       <footer className="auth-shell__footer">
-        <p>© {new Date().getFullYear()} Overtone</p>
+        <p>© {new Date().getFullYear()} DeckVoice</p>
         <div className="auth-shell__footer-links">
           <a href={`${marketingUrl}/privacy`}>Privacy</a>
           <a href={`${marketingUrl}/terms`}>Terms</a>

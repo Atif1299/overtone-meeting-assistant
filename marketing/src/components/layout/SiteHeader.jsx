@@ -3,7 +3,7 @@ import { Link, NavLink } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { dashboardUrl, navLinks } from "../../config.js";
 import MobileNav from "./MobileNav.jsx";
-import OvertoneMark from "../visuals/OvertoneMark.jsx";
+import DeckVoiceMark from "../visuals/DeckVoiceMark.jsx";
 
 export default function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -12,9 +12,9 @@ export default function SiteHeader() {
     <header className={`site-header${open ? " is-menu-open" : ""}`}>
       <Link to="/" className="logo" onClick={() => setOpen(false)}>
         <span className="logo-mark">
-          <OvertoneMark tone="dark" size={28} decorative />
+          <DeckVoiceMark tone="dark" size={28} decorative />
         </span>
-        Overtone
+        DeckVoice
       </Link>
 
       <nav className="site-nav desktop-only" aria-label="Primary">
