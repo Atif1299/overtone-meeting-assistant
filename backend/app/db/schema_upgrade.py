@@ -20,4 +20,30 @@ def ensure_schema_upgrades() -> None:
                 except Exception:  # noqa: BLE001
                     pass
 
+    if "v2_subscriptions" in tables:
+        cols = {c["name"] for c in insp.get_columns("v2_subscriptions")}
+        with engine.begin() as conn:
+            if "paddle_customer_id" not in cols:
+                conn.execute(text("ALTER TABLE v2_subscriptions ADD COLUMN paddle_customer_id VARCHAR"))
+                try:
+                    conn.execute(
+                        text(
+                            "CREATE INDEX ix_v2_subscriptions_paddle_customer_id "
+                            "ON v2_subscriptions (paddle_customer_id)"
+                        )
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+            if "paddle_subscription_id" not in cols:
+                conn.execute(text("ALTER TABLE v2_subscriptions ADD COLUMN paddle_subscription_id VARCHAR"))
+                try:
+                    conn.execute(
+                        text(
+                            "CREATE INDEX ix_v2_subscriptions_paddle_subscription_id "
+                            "ON v2_subscriptions (paddle_subscription_id)"
+                        )
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+
     # create_all handles new SaaS tables; this covers legacy DBs

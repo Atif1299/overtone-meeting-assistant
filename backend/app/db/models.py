@@ -122,6 +122,8 @@ class Subscription(Base):
     status: Mapped[str] = mapped_column(String, default="active")
     stripe_customer_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    paddle_customer_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    paddle_subscription_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     current_period_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)

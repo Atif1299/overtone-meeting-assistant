@@ -65,11 +65,20 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_jwt_secret: str = ""
 
-    # Stripe billing
+    # Stripe billing (unused; Paddle is the live provider)
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_price_starter: str = ""
     stripe_price_pro: str = ""
+
+    # Paddle billing
+    paddle_api_key: str = ""
+    paddle_webhook_secret: str = ""
+    paddle_price_starter: str = ""
+    paddle_price_pro: str = ""
+    paddle_client_token: str = ""
+    paddle_api_base: str = "https://sandbox-api.paddle.com"
+
     marketing_url: str = "http://127.0.0.1:5177"
     dashboard_url: str = "http://127.0.0.1:5176"
 
