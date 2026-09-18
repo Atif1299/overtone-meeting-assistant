@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local development starter for Overtone.
+# Local development starter for DeckVoice.
 # Starts backend (8001), presenter (5175), dashboard (5176).
 # Press Ctrl+C to stop everything.
 

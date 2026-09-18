@@ -1,4 +1,4 @@
-# Local development starter for Overtone on Windows.
+# Local development starter for DeckVoice on Windows.
 # Starts backend (8001), presenter (5175), dashboard (5176).
 #
 #   .\start-local.ps1              # API + UIs
