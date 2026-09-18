@@ -58,12 +58,19 @@ export function AuthProvider({ children }) {
     };
   }, [session]);
 
+  async function refreshProfile() {
+    if (!session?.access_token) return;
+    const me = await apiGet("/api/v1/me");
+    setProfile(me);
+  }
+
   const value = useMemo(
     () => ({
       session,
       profile,
       loading,
       supabaseConfigured,
+      refreshProfile,
       signOut: async () => {
         if (supabase) await supabase.auth.signOut();
       },

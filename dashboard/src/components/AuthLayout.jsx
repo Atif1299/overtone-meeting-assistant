@@ -71,6 +71,7 @@ export default function AuthLayout({ children }) {
         <div className="auth-shell__footer-links">
           <a href={`${marketingUrl}/privacy`}>Privacy</a>
           <a href={`${marketingUrl}/terms`}>Terms</a>
+          <a href={`${marketingUrl}/refund`}>Refunds</a>
           <a href={`${marketingUrl}/pricing`}>Pricing</a>
         </div>
       </footer>

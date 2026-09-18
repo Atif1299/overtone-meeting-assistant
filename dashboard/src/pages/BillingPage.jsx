@@ -3,6 +3,57 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiGet, apiPost } from "../utils/api.js";
 
+const PADDLE_JS = "https://cdn.paddle.com/paddle/v2/paddle.js";
+
+let paddleInit = null;
+let paddleEventHandler = () => {};
+const openedTransactions = new Set();
+
+function loadPaddleScript() {
+  if (window.Paddle) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector("script[data-paddle-js]");
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Paddle.js failed to load")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = PADDLE_JS;
+    script.async = true;
+    script.dataset.paddleJs = "true";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Paddle.js failed to load"));
+    document.head.appendChild(script);
+  });
+}
+
+function ensurePaddle(config) {
+  if (!paddleInit) {
+    paddleInit = loadPaddleScript().then(() => {
+      if (config.environment === "sandbox") {
+        window.Paddle.Environment.set("sandbox");
+      }
+      window.Paddle.Initialize({
+        token: config.client_token,
+        checkout: {
+          settings: {
+            successUrl: `${window.location.origin}/app/billing?checkout=success`,
+          },
+        },
+        eventCallback: (event) => paddleEventHandler(event),
+      });
+    });
+  }
+  return paddleInit;
+}
+
+function openCheckout(transactionId) {
+  if (!transactionId || !window.Paddle || openedTransactions.has(transactionId)) return;
+  openedTransactions.add(transactionId);
+  window.Paddle.Checkout.open({ transactionId });
+}
+
 function UsageBar({ label, used, limit }) {
   const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
   return (
@@ -19,7 +70,7 @@ function UsageBar({ label, used, limit }) {
 }
 
 export default function BillingPage() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [params] = useSearchParams();
   const [usage, setUsage] = useState(null);
   const [message, setMessage] = useState("");
@@ -28,7 +79,23 @@ export default function BillingPage() {
   async function load() {
     const data = await apiGet("/api/v1/billing/usage");
     setUsage(data);
+    if (refreshProfile) {
+      await refreshProfile();
+    }
   }
+
+  useEffect(() => {
+    paddleEventHandler = (event) => {
+      if (event?.name === "checkout.completed") {
+        setMessage("Subscription updated — thank you!");
+        load();
+        setBusy("");
+      }
+      if (event?.name === "checkout.closed") {
+        setBusy("");
+      }
+    };
+  });
 
   useEffect(() => {
     load().catch((e) => setMessage(String(e.message || e)));
@@ -41,15 +108,36 @@ export default function BillingPage() {
     }
   }, [params]);
 
+  useEffect(() => {
+    const txn = params.get("_ptxn");
+    let cancelled = false;
+    apiGet("/api/v1/billing/paddle-config")
+      .then((config) => ensurePaddle(config))
+      .then(() => {
+        if (!cancelled && txn) openCheckout(txn);
+      })
+      .catch((e) => {
+        if (!cancelled) setMessage(String(e.message || e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [params]);
+
   async function checkout(plan) {
     setBusy(plan);
     setMessage("");
     try {
-      const { url } = await apiPost("/api/v1/billing/checkout", { plan });
+      const config = await apiGet("/api/v1/billing/paddle-config");
+      await ensurePaddle(config);
+      const { url, transaction_id: transactionId } = await apiPost("/api/v1/billing/checkout", { plan });
+      if (transactionId && window.Paddle) {
+        openCheckout(transactionId);
+        return;
+      }
       window.location.href = url;
     } catch (e) {
       setMessage(String(e.message || e));
-    } finally {
       setBusy("");
     }
   }
@@ -67,6 +155,9 @@ export default function BillingPage() {
   }
 
   const plan = usage?.plan || profile?.plan || "free";
+  const showStarter = plan === "free";
+  const showPro = plan === "free" || plan === "starter";
+  const showPortal = plan === "starter" || plan === "pro";
 
   return (
     <section className="page-section">
@@ -75,6 +166,12 @@ export default function BillingPage() {
       <p className="lede">Current plan: <strong className="plan-pill">{plan}</strong></p>
       {plan === "free" ? (
         <p className="helper-text">Free trial includes 1 deck upload and 5 bot launches each month. No card required.</p>
+      ) : null}
+      {plan === "starter" ? (
+        <p className="helper-text">Starter includes 3 deck uploads and 5 bot launches each month.</p>
+      ) : null}
+      {plan === "pro" ? (
+        <p className="helper-text">Pro includes 10 deck uploads and 20 bot launches each month.</p>
       ) : null}
 
       {usage ? (
@@ -85,15 +182,21 @@ export default function BillingPage() {
       ) : null}
 
       <div className="billing-actions">
-        <button type="button" className="button button-primary" disabled={!!busy} onClick={() => checkout("starter")}>
-          {busy === "starter" ? "Redirecting…" : "Upgrade to Starter — $10/mo"}
-        </button>
-        <button type="button" className="button button-secondary" disabled={!!busy} onClick={() => checkout("pro")}>
-          {busy === "pro" ? "Redirecting…" : "Upgrade to Pro — $20/mo"}
-        </button>
-        <button type="button" className="button button-ghost" disabled={!!busy} onClick={portal}>
-          Manage subscription
-        </button>
+        {showStarter ? (
+          <button type="button" className="button button-primary" disabled={!!busy} onClick={() => checkout("starter")}>
+            {busy === "starter" ? "Opening checkout…" : "Upgrade to Starter — $10/mo"}
+          </button>
+        ) : null}
+        {showPro ? (
+          <button type="button" className="button button-secondary" disabled={!!busy} onClick={() => checkout("pro")}>
+            {busy === "pro" ? "Opening checkout…" : "Upgrade to Pro — $20/mo"}
+          </button>
+        ) : null}
+        {showPortal ? (
+          <button type="button" className="button button-ghost" disabled={!!busy} onClick={portal}>
+            Manage subscription
+          </button>
+        ) : null}
       </div>
 
       {message ? <p className="banner-note">{message}</p> : null}
