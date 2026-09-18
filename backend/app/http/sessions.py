@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
 class LaunchIn(BaseModel):
     meeting_url: str
     presentation_id: str
-    bot_name: str = "Overtone"
+    bot_name: str = "DeckVoice"
     agent_name: str = "default"
 
 

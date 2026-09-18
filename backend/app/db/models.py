@@ -51,7 +51,7 @@ class Session(Base):
     bot_id: Mapped[str | None] = mapped_column(String, nullable=True)
     recall_bot_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     presentation_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    bot_name: Mapped[str] = mapped_column(String, default="Overtone")
+    bot_name: Mapped[str] = mapped_column(String, default="DeckVoice")
     meeting_url: Mapped[str] = mapped_column(String, default="")
     agent_name: Mapped[str] = mapped_column(String, default="default")
     agent_version: Mapped[int | None] = mapped_column(Integer, nullable=True)

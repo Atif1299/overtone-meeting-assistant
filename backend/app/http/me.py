@@ -38,7 +38,7 @@ def get_me(
     if ctx.is_operator:
         return MeOut(
             user_id="operator",
-            email="operator@overtone.local",
+            email="operator@deckvoice.local",
             full_name="Operator",
             workspace_id="operator",
             workspace_name="Operator",

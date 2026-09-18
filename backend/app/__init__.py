@@ -1,1 +1,1 @@
-"""Overtone V2 API package."""
+"""DeckVoice API package."""

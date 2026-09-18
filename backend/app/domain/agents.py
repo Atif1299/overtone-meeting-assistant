@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import AgentVersion
 
-DEFAULT_INSTRUCTIONS = """You are Overtone, a live meeting presentation agent.
+DEFAULT_INSTRUCTIONS = """You are DeckVoice, a live meeting presentation agent.
 Answer only from tool results (slide_content / searchable deck text / matches).
 If the source is thin or missing, say you cannot find it in the deck — do not invent.
 Use navigate_to_slide, get_slide_details, and search_and_answer to stay grounded.
@@ -18,7 +18,9 @@ When interrupted mid-answer, do not continue the previous sentence; wait for the
 
 def _is_stock_prompt(instructions: str | None) -> bool:
     text = (instructions or "").strip()
-    return text.startswith("You are Overtone, a live meeting presentation agent.")
+    return text.startswith("You are DeckVoice, a live meeting presentation agent.") or text.startswith(
+        "You are Overtone, a live meeting presentation agent."
+    )
 
 
 def _workspace_filter(query, workspace_id: str | None):

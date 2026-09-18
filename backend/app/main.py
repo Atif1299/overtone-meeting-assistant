@@ -15,7 +15,7 @@ from app.realtime import relay
 from fastapi import Depends
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("overtone.v2")
+logger = logging.getLogger("deckvoice.v2")
 
 
 @asynccontextmanager
@@ -26,13 +26,13 @@ async def lifespan(_app: FastAPI):
         agent_store.ensure_default_agent(db)
     finally:
         db.close()
-    logger.info("Overtone V2 API ready")
+    logger.info("DeckVoice API ready")
     yield
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="Overtone V2", version="2.0.0", lifespan=lifespan)
+    app = FastAPI(title="DeckVoice", version="2.0.0", lifespan=lifespan)
     origins = [o.strip() for o in settings.cors_allowed_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,

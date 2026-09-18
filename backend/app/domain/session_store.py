@@ -88,7 +88,7 @@ class SessionStore:
             sess = LiveSession(
                 session_id=row.session_id,
                 presentation_id=row.presentation_id or "",
-                bot_name=row.bot_name or "Overtone",
+                bot_name=row.bot_name or "DeckVoice",
                 meeting_url=row.meeting_url or "",
                 agent_name=row.agent_name or "default",
                 agent_version=row.agent_version,
