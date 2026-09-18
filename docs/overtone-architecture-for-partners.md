@@ -1,4 +1,4 @@
-# Overtone — Architecture Overview
+# DeckVoice — Architecture Overview
 
 **Audience:** technical discussion (meeting join + live grounding)  
 **Status:** under active development — demo / architecture stage, not a finished compliance product  
@@ -8,7 +8,7 @@
 
 ## One-line framing
 
-Overtone is a **live meeting layer**: a bot joins Google Meet / Zoom / Teams as a participant, presents a deck, listens with realtime speech-to-speech, and answers from **indexed session sources** — with a design goal to **abstain or escalate** when grounding is weak (not invent).
+DeckVoice is a **live meeting layer**: a bot joins Google Meet / Zoom / Teams as a participant, presents a deck, listens with realtime speech-to-speech, and answers from **indexed session sources** — with a design goal to **abstain or escalate** when grounding is weak (not invent).
 
 It is **not** a finished “zero-hallucination guarantee” product. The honest framing is: **traceable, source-bound outputs + hard stop when the source cannot support an answer.**
 
@@ -23,7 +23,7 @@ flowchart TB
   recall[Recall.ai meeting bot]
   meet[Google Meet / Zoom / Teams]
   presenter[Presenter UI output media]
-  api[Overtone backend FastAPI]
+  api[DeckVoice backend FastAPI]
   live[Realtime voice Gemini Live or OpenAI]
   index[(Slide index pgvector + local fallback)]
   gcs[(GCS deck artifacts)]
@@ -196,17 +196,17 @@ Durable session flags (greeting already sent, muted, current page) are merged in
 
 ## How this relates to a digital protégé product
 
-| Protégé concern | Overtone role |
+| Protégé concern | DeckVoice role |
 |---|---|
 | Join Meet/Zoom as participant | Meeting adapter (today’s focus of this demo) |
 | Follow conversation without guessing | Session + deck grounding + abstain |
 | Respond when addressed | Realtime voice + tools |
 | Escalate when unsure | Architectural fit — to align with expert KB / human handoff |
 
-Overtone is best understood as a **live meeting adapter + grounding shell**, not a replacement for an expert-judgment knowledge system.
+DeckVoice is best understood as a **live meeting adapter + grounding shell**, not a replacement for an expert-judgment knowledge system.
 
 ---
 
 ## Contact / demo note
 
-This document describes the **current engineering architecture** of Overtone as of the date above. Capabilities labeled roadmap are intentional design direction, not production guarantees.
+This document describes the **current engineering architecture** of DeckVoice as of the date above. Capabilities labeled roadmap are intentional design direction, not production guarantees.

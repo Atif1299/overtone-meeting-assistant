@@ -1,8 +1,8 @@
 # Meeting transcript — Drew Harris × Muhammad Atif
 
 **Date:** Thursday, 20 Aug 2026 (approx.)  
-**Context:** Follow-up — Overtone stack + Meet join demo; Expert Scale / Apex Replicant  
-**Participants:** Drew Harris (Expert Scale), Muhammad Atif (Overtone)
+**Context:** Follow-up — DeckVoice stack + Meet join demo; Expert Scale / Apex Replicant  
+**Participants:** Drew Harris (Expert Scale), Muhammad Atif (DeckVoice)
 
 ---
 

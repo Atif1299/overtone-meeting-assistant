@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="Overtone — AI meeting presentation agent" width="800"/>
+  <img src="docs/assets/banner.svg" alt="DeckVoice — AI that presents your deck live in Meet, Zoom, or Teams" width="800"/>
 </p>
 
 <p align="center">
@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"/>
 </p>
 
-<p align="center"><strong>Upload a deck. Paste a meeting link. Overtone joins, presents, and answers questions live.</strong></p>
+<p align="center"><strong>Upload a deck. Paste a meeting link. DeckVoice joins, presents, and answers questions live.</strong></p>
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
@@ -25,9 +25,9 @@
 
 ---
 
-## What is Overtone?
+## What is DeckVoice?
 
-Overtone is an **AI meeting presentation agent**. Upload a PPTX or PDF, launch a bot with a Google Meet / Zoom / Teams link, and Overtone joins the call as a presenter — showing your slides as the bot camera and speaking through a realtime voice model.
+DeckVoice is an **AI meeting presentation agent**. Upload a PPTX or PDF, launch a bot with a Google Meet / Zoom / Teams link, and DeckVoice joins the call as a presenter — showing your slides as the bot camera and speaking through a realtime voice model.
 
 It reads your **indexed deck**, navigates slides on demand, and answers audience questions **grounded in slide content** — not generic chat.
 
@@ -106,9 +106,10 @@ See [deploy/DEPLOY.md](deploy/DEPLOY.md) for GCP project setup, secrets, and rol
 
 | Service | URL |
 |---------|-----|
-| API | https://overtone-v2-api-4idrhaffca-uc.a.run.app |
-| Presenter | https://overtone-v2-presenter-4idrhaffca-uc.a.run.app |
-| Dashboard | https://overtone-v2-dashboard-4idrhaffca-uc.a.run.app |
+| API | https://deckvoice-v2-api-4idrhaffca-uc.a.run.app |
+| Presenter | https://deckvoice-v2-presenter-4idrhaffca-uc.a.run.app |
+| Dashboard | https://deckvoice-v2-dashboard-4idrhaffca-uc.a.run.app |
+| Marketing | https://deckvoice-marketing-4idrhaffca-uc.a.run.app |
 
 ---
 

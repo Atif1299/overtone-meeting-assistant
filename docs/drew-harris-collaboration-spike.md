@@ -1,7 +1,7 @@
-# Collaboration spike outline — Expert Scale × Overtone
+# Collaboration spike outline — Expert Scale × DeckVoice
 
 **To:** Drew Harris (Expert Scale / Apex Replicant)  
-**From:** Muhammad Atif (Overtone)  
+**From:** Muhammad Atif (DeckVoice)  
 **Date:** August 2026  
 **Status:** Proposal only — no commercial commitment
 
@@ -9,7 +9,7 @@
 
 ## Why this spike
 
-On our call you said Protégé today runs through a **web interface**, and **live meeting join** is the missing piece. Overtone already joins Meet/Zoom/Teams as a participant and answers from an indexed deck.
+On our call you said Protégé today runs through a **web interface**, and **live meeting join** is the missing piece. DeckVoice already joins Meet/Zoom/Teams as a participant and answers from an indexed deck.
 
 You also described when Protégé escalates:
 
@@ -35,7 +35,7 @@ Not a product sale. Not investment. A **collaboration proof** so we can decide f
 
 | # | Deliverable |
 |---|-------------|
-| 1 | Meet join (Recall) + realtime voice + deck/session grounding (existing Overtone path) |
+| 1 | Meet join (Recall) + realtime voice + deck/session grounding (existing DeckVoice path) |
 | 2 | Escalation mapping stub: out-of-scope refuse / on-scope dig / escalate-if-thin → log **needs expert** |
 | 3 | Short write-up: what worked, latency notes, what would need to plug into Apex/Protégé APIs |
 
@@ -59,7 +59,7 @@ We call the spike successful if:
 
 ## What each side brings
 
-| You (Expert Scale) | Us (Overtone) |
+| You (Expert Scale) | Us (DeckVoice) |
 |--------------------|---------------|
 | Escalation rules + when “needs expert” is correct | Meet/Zoom/Teams join + presenter AV + voice relay |
 | Optional: sample specialty scope (e.g. GTM-only) for the test | Indexed deck / session grounding + tool calls |
@@ -79,4 +79,4 @@ We call the spike successful if:
 
 Muhammad Atif — ranaatif1299@gmail.com  
 
-Dashboard (Launch): https://overtone-dashboard-4idrhaffca-uc.a.run.app
+Dashboard (Launch): https://deckvoice-v2-dashboard-4idrhaffca-uc.a.run.app

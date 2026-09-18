@@ -8,7 +8,7 @@ Attach all three PDFs to one email (order matters).
 | 2 | `02_Overtone_Collaboration_Spike_Outline.pdf` | Promised spike outline |
 | 3 | `03_Overtone_Architecture_Overview.pdf` | Architecture briefing |
 
-**Dashboard URL in PDFs:** https://overtone-dashboard-4idrhaffca-uc.a.run.app  
+**Dashboard URL in PDFs:** https://deckvoice-v2-dashboard-4idrhaffca-uc.a.run.app  
 
 Regenerate after edits:
 

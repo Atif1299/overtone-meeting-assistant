@@ -46,7 +46,7 @@
 ### Do this week (you)
 
 1. **Send the one-page spike outline** (promised on-call). Keep it short:
-   - Goal: Protégé escalation judgment + Overtone Meet join, one end-to-end path
+   - Goal: Protégé escalation judgment + DeckVoice Meet join, one end-to-end path
    - Success: grounded answer OR clean escalate / need-expert log
    - Out of scope: full commercial deal
    - Ask: 1 working session with him after he tries Launch

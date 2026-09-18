@@ -1,4 +1,4 @@
-# Overtone SaaS setup
+# DeckVoice SaaS setup
 
 ## Stack
 - **Auth:** Supabase (email/password)
@@ -14,14 +14,14 @@ STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_STARTER=price_...
 STRIPE_PRICE_PRO=price_...
-MARKETING_URL=https://overtone-marketing-....run.app
-DASHBOARD_URL=https://overtone-v2-dashboard-....run.app
+MARKETING_URL=https://deckvoice-marketing-....run.app
+DASHBOARD_URL=https://deckvoice-v2-dashboard-....run.app
 OPEN_DEMO_ACCESS=false
 PRESENTER_TOKEN_SECRET=random-long-secret
 ```
 
 ## Stripe setup
-1. Create products: Overtone Starter ($10/mo), Overtone Pro ($20/mo)
+1. Create products: DeckVoice Starter ($10/mo), DeckVoice Pro ($20/mo)
 2. Copy Price IDs to `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_PRO`
 3. Webhook: `POST /webhooks/stripe` — events: checkout.session.completed, customer.subscription.*
 
@@ -31,14 +31,14 @@ PRESENTER_TOKEN_SECRET=random-long-secret
 
 ## Dashboard env (build-time)
 ```
-VITE_API_BASE=https://overtone-v2-api-....run.app
+VITE_API_BASE=https://deckvoice-v2-api-....run.app
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
 
 ## Marketing env (build-time)
 ```
-VITE_DASHBOARD_URL=https://overtone-v2-dashboard-....run.app
+VITE_DASHBOARD_URL=https://deckvoice-v2-dashboard-....run.app
 ```
 
 ## Plans

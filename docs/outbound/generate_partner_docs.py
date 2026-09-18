@@ -200,10 +200,10 @@ def build_collaboration():
     doc = setup_doc()
 
     add_title(doc, "Collaboration Spike Outline")
-    add_subtitle(doc, "Expert Scale × Overtone — Technical Collaboration Proposal")
+    add_subtitle(doc, "Expert Scale × DeckVoice — Technical Collaboration Proposal")
 
     add_meta_line(doc, "Prepared for", "Drew Harris, Founder — Expert Scale (Apex Replicant™)")
-    add_meta_line(doc, "Prepared by", "Muhammad Atif — Overtone")
+    add_meta_line(doc, "Prepared by", "Muhammad Atif — DeckVoice")
     add_meta_line(doc, "Date", "August 2026")
     add_meta_line(doc, "Status", "Proposal only — no commercial commitment")
     add_hr(doc)
@@ -212,7 +212,7 @@ def build_collaboration():
     add_body(
         doc,
         "On our discussion you confirmed that Protégé runs primarily through a web interface today, "
-        "and that live meeting join is the missing capability. Overtone already joins Meet, Zoom, and Teams "
+        "and that live meeting join is the missing capability. DeckVoice already joins Meet, Zoom, and Teams "
         "as a participant and answers from an indexed deck or session source.",
     )
     add_heading(doc, "Escalation model (as you described)", 2)
@@ -265,7 +265,7 @@ def build_collaboration():
         [
             [
                 "1",
-                "Meet join (Recall) + realtime voice + deck/session grounding (existing Overtone path)",
+                "Meet join (Recall) + realtime voice + deck/session grounding (existing DeckVoice path)",
             ],
             [
                 "2",
@@ -305,7 +305,7 @@ def build_collaboration():
     add_heading(doc, "5. Contribution model", 1)
     add_table(
         doc,
-        ["Expert Scale", "Overtone"],
+        ["Expert Scale", "DeckVoice"],
         [
             [
                 "Escalation rules + when “needs expert” is correct",
@@ -342,9 +342,9 @@ def build_collaboration():
 
     add_hr(doc)
     add_heading(doc, "Contact", 2)
-    add_body(doc, "Muhammad Atif — Overtone", justify=False)
+    add_body(doc, "Muhammad Atif — DeckVoice", justify=False)
     add_body(doc, "ranaatif1299@gmail.com", justify=False)
-    add_body(doc, "Dashboard (Launch): https://overtone-dashboard-4idrhaffca-uc.a.run.app", justify=False)
+    add_body(doc, "Dashboard (Launch): https://deckvoice-v2-dashboard-4idrhaffca-uc.a.run.app", justify=False)
 
     path = OUT / "Overtone_Collaboration_Spike.docx"
     doc.save(path)
@@ -355,10 +355,10 @@ def build_architecture():
     doc = setup_doc()
 
     add_title(doc, "Architecture Overview")
-    add_subtitle(doc, "Overtone — Meeting Join & Live Grounding")
+    add_subtitle(doc, "DeckVoice — Meeting Join & Live Grounding")
 
     add_meta_line(doc, "Audience", "Technical partnership discussion")
-    add_meta_line(doc, "Prepared by", "Muhammad Atif — Overtone")
+    add_meta_line(doc, "Prepared by", "Muhammad Atif — DeckVoice")
     add_meta_line(doc, "Date", "August 2026")
     add_meta_line(doc, "Status", "Active development — demo / architecture stage")
     add_meta_line(doc, "Classification", "Confidential — partner review")
@@ -368,7 +368,7 @@ def build_architecture():
     add_rich_body(
         doc,
         [
-            ("Overtone is a ", False),
+            ("DeckVoice is a ", False),
             ("live meeting layer", True),
             (
                 ": a bot joins Google Meet, Zoom, or Teams as a participant, presents a deck, "
@@ -511,7 +511,7 @@ def build_architecture():
     add_heading(doc, "9. Fit with a digital protégé product", 1)
     add_table(
         doc,
-        ["Protégé concern", "Overtone role"],
+        ["Protégé concern", "DeckVoice role"],
         [
             ["Join Meet / Zoom as participant", "Meeting adapter (focus of current demos)"],
             ["Follow conversation without guessing", "Session + deck grounding + abstain"],
@@ -523,7 +523,7 @@ def build_architecture():
     add_rich_body(
         doc,
         [
-            ("Overtone is best understood as a ", False),
+            ("DeckVoice is best understood as a ", False),
             ("live meeting adapter + grounding shell", True),
             (", not a replacement for an expert-judgment knowledge system.", False),
         ],

@@ -188,7 +188,7 @@ def header_footer(canvas, doc, doc_title: str):
     canvas.line(0.75 * inch, page_h - 0.55 * inch, page_w - 0.75 * inch, page_h - 0.55 * inch)
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(MUTED)
-    canvas.drawString(0.75 * inch, page_h - 0.45 * inch, "OVERTONE")
+    canvas.drawString(0.75 * inch, page_h - 0.45 * inch, "DECKVOICE")
     canvas.drawRightString(page_w - 0.75 * inch, page_h - 0.45 * inch, doc_title)
     # bottom
     canvas.line(0.75 * inch, 0.55 * inch, page_w - 0.75 * inch, 0.55 * inch)
@@ -200,7 +200,7 @@ def header_footer(canvas, doc, doc_title: str):
 def cover_block(story, s, brand_line: str, title: str, meta_lines: list[str]):
     """Full-bleed-style cover using a dark table band."""
     inner = [
-        Paragraph("OVERTONE", s["cover_brand"]),
+        Paragraph("DECKVOICE", s["cover_brand"]),
         Paragraph(brand_line, s["cover_sub"]),
         Spacer(1, 8),
         HRFlowable(width="100%", thickness=1, color=ACCENT, spaceBefore=4, spaceAfter=4),
@@ -299,7 +299,7 @@ def build_cover_letter():
         "Follow-Up — Collaboration Discussion",
         [
             "Prepared for: Drew Harris, Founder — Expert Scale (Apex Replicant™)",
-            "Prepared by: Muhammad Atif — Overtone",
+            "Prepared by: Muhammad Atif — DeckVoice",
             "Date: 21 August 2026",
             "Classification: Confidential",
         ],
@@ -316,7 +316,7 @@ def build_cover_letter():
     story.append(
         Paragraph(
             "You noted that Protégé today operates through a web interface, and that live meeting join "
-            "is the missing piece. That is precisely the path Overtone has been building: a participant "
+            "is the missing piece. That is precisely the path DeckVoice has been building: a participant "
             "bot in Meet / Zoom / Teams, grounded answers from indexed session sources, and a clear stop "
             "when the source cannot support a reply.",
             s["body"],
@@ -350,7 +350,7 @@ def build_cover_letter():
     )
     story.append(
         Paragraph(
-            "Dashboard (Launch): <b>https://overtone-dashboard-4idrhaffca-uc.a.run.app</b><br/>"
+            "Dashboard (Launch): <b>https://deckvoice-v2-dashboard-4idrhaffca-uc.a.run.app</b><br/>"
             "Please note: realtime latency is still being optimized (~3–4 seconds in places). "
             "Honest feedback after a self-test is welcome.",
             s["body_left"],
@@ -362,7 +362,7 @@ def build_cover_letter():
             "I look forward to your thoughts.<br/><br/>"
             "Respectfully,<br/><br/>"
             "<b>Muhammad Atif</b><br/>"
-            "Overtone<br/>"
+            "DeckVoice<br/>"
             "ranaatif1299@gmail.com",
             s["body_left"],
         )
@@ -392,11 +392,11 @@ def build_spike():
     cover_block(
         story,
         s,
-        "Expert Scale × Overtone — technical collaboration proposal",
+        "Expert Scale × DeckVoice — technical collaboration proposal",
         "Collaboration Spike Outline",
         [
             "To: Drew Harris — Expert Scale / Apex Replicant™",
-            "From: Muhammad Atif — Overtone",
+            "From: Muhammad Atif — DeckVoice",
             "Date: August 2026",
             "Status: Proposal only — no commercial commitment",
         ],
@@ -406,7 +406,7 @@ def build_spike():
     story.append(
         Paragraph(
             "On our discussion you confirmed that Protégé runs primarily through a web interface today, "
-            "and that <b>live meeting join</b> is the missing capability. Overtone already joins Meet / Zoom / Teams "
+            "and that <b>live meeting join</b> is the missing capability. DeckVoice already joins Meet / Zoom / Teams "
             "as a participant and answers from an indexed deck or session source.",
             s["body"],
         )
@@ -449,7 +449,7 @@ def build_spike():
         table(
             ["#", "Deliverable"],
             [
-                ["1", "Meet join (Recall) + realtime voice + deck/session grounding (existing Overtone path)"],
+                ["1", "Meet join (Recall) + realtime voice + deck/session grounding (existing DeckVoice path)"],
                 [
                     "2",
                     "Escalation mapping stub: out-of-scope refuse / on-scope dig / escalate-if-thin → log needs expert",
@@ -488,7 +488,7 @@ def build_spike():
     story.append(Paragraph("5. Contribution model", s["h1"]))
     story.append(
         table(
-            ["Expert Scale", "Overtone"],
+            ["Expert Scale", "DeckVoice"],
             [
                 [
                     "Escalation rules + when “needs expert” is correct",
@@ -523,8 +523,8 @@ def build_spike():
     story.append(Spacer(1, 8))
     story.append(
         Paragraph(
-            "<b>Contact</b><br/>Muhammad Atif · Overtone · ranaatif1299@gmail.com<br/>"
-            "Dashboard: https://overtone-dashboard-4idrhaffca-uc.a.run.app",
+            "<b>Contact</b><br/>Muhammad Atif · DeckVoice · ranaatif1299@gmail.com<br/>"
+            "Dashboard: https://deckvoice-v2-dashboard-4idrhaffca-uc.a.run.app",
             s["small"],
         )
     )
@@ -568,7 +568,7 @@ def build_architecture():
     story.append(Paragraph("1. Framing", s["h1"]))
     story.append(
         Paragraph(
-            "Overtone is a <b>live meeting layer</b>: a bot joins Google Meet / Zoom / Teams as a participant, "
+            "DeckVoice is a <b>live meeting layer</b>: a bot joins Google Meet / Zoom / Teams as a participant, "
             "presents a deck, listens with realtime speech-to-speech, and answers from <b>indexed session sources</b> — "
             "with a design goal to <b>abstain or escalate</b> when grounding is weak (not invent).",
             s["body"],
@@ -706,7 +706,7 @@ def build_architecture():
     story.append(Paragraph("9. Fit with a digital protégé product", s["h1"]))
     story.append(
         table(
-            ["Protégé concern", "Overtone role"],
+            ["Protégé concern", "DeckVoice role"],
             [
                 ["Join Meet / Zoom as participant", "Meeting adapter (focus of current demos)"],
                 ["Follow conversation without guessing", "Session + deck grounding + abstain"],
@@ -718,7 +718,7 @@ def build_architecture():
     )
     story.append(
         Paragraph(
-            "Overtone is best understood as a <b>live meeting adapter + grounding shell</b>, "
+            "DeckVoice is best understood as a <b>live meeting adapter + grounding shell</b>, "
             "not a replacement for an expert-judgment knowledge system.",
             s["body"],
         )

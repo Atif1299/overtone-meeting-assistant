@@ -24,7 +24,7 @@
 
 > “Drew — thanks for the time. I’ll keep this tight: how the bot joins the room, how it stays grounded in a deck/session, and where I’d put abstain/escalate — same philosophy you described, not a zero-hallucination guarantee.
 >
-> Overtone is under active build. I’m showing architecture and a live join path, not a finished compliance product. Where I think it fits you is the Meet/Zoom participant layer on your protégé roadmap.”
+> DeckVoice is under active build. I’m showing architecture and a live join path, not a finished compliance product. Where I think it fits you is the Meet/Zoom participant layer on your protégé roadmap.”
 
 ### 1:30–3:00 — Architecture snapshot (share MD)
 
@@ -59,7 +59,7 @@ Do **not** apologize for two minutes. Do **not** invent features.
 > Three — source first: deck/session index before anything external.  
 > Four — escalate: if we can’t ground it, we should hand to a human expert and treat that answer as ground truth.
 >
-> Today Overtone is strongest on join + live session + deck grounding. The human-escalate queue as first-class ground truth is the piece I’d align to Apex rather than rebuild. That’s where collaboration is more interesting than competition.”
+> Today DeckVoice is strongest on join + live session + deck grounding. The human-escalate queue as first-class ground truth is the piece I’d align to Apex rather than rebuild. That’s where collaboration is more interesting than competition.”
 
 ### 11:30–13:30 — Stack (crisp)
 
@@ -109,7 +109,7 @@ Short answer:
 
 ## Follow-up email (send within a few hours)
 
-**Subject:** Overtone join path + escalate fit — notes from today
+**Subject:** DeckVoice join path + escalate fit — notes from today
 
 ```
 Drew —
