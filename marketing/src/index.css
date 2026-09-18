@@ -2358,11 +2358,24 @@ html
   margin-bottom: 0.6rem;
 }
 
-.legal-section p
+.legal-section p,
+.legal-section li
 {
   color: var(--muted);
   font-size: 0.95rem;
   line-height: 1.65;
+}
+
+.legal-section ul
+{
+  margin: 0.5rem 0 0.85rem 1.15rem;
+}
+
+.legal-section a
+{
+  color: var(--accent-a);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 /* ── Responsive ── */

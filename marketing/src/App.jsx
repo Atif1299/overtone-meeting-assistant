@@ -7,6 +7,8 @@ import HowItWorksPage from "./pages/HowItWorksPage.jsx";
 import UseCasesPage from "./pages/UseCasesPage.jsx";
 import PrivacyPage from "./pages/PrivacyPage.jsx";
 import TermsPage from "./pages/TermsPage.jsx";
+import RefundPage from "./pages/RefundPage.jsx";
+import ContactPage from "./pages/ContactPage.jsx";
 
 export default function App() {
   return (
@@ -19,6 +21,8 @@ export default function App() {
         <Route path="/use-cases" element={<UseCasesPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/refund" element={<RefundPage />} />
+        <Route path="/contact" element={<ContactPage />} />
       </Route>
     </Routes>
   );

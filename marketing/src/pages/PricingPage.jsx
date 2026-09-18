@@ -18,15 +18,15 @@ const compareRows = [
   { feature: "Bot launches / month", values: ["1", "5", "20"] },
   { feature: "Deck uploads / month", values: ["1", "3", "10"] },
   { feature: "Agent prompt studio", values: ["✓", "✓", "✓"] },
-  { feature: "Stripe billing portal", values: ["—", "✓", "✓"] },
+  { feature: "Paddle billing portal", values: ["—", "✓", "✓"] },
   { feature: "Support", values: ["Community", "Email", "Priority"] },
 ];
 
 const faq = [
   { q: "What counts as a bot launch?", a: "Each time you click Launch and DeckVoice creates a new Recall bot for a meeting URL, that counts as one launch for the billing period." },
   { q: "What counts as a deck upload?", a: "Each new PPTX or PDF you upload to your workspace counts as one upload, regardless of slide count." },
-  { q: "Can I upgrade mid-month?", a: "Yes. Upgrade through the billing page — Stripe prorates your subscription automatically." },
-  { q: "Is there a contract or lock-in?", a: "No. Cancel anytime from the Stripe customer portal. Your workspace data remains until you delete it." },
+  { q: "Can I upgrade mid-month?", a: "Yes. Upgrade through the billing page. Paddle charges the new plan from the next invoice unless you change it immediately in the portal." },
+  { q: "Is there a contract or lock-in?", a: "No. Cancel anytime from the Paddle customer portal. Your workspace data remains until you delete it." },
 ];
 
 export default function PricingPage() {
@@ -51,9 +51,9 @@ export default function PricingPage() {
 
       <SplitFeature
         eyebrow="Trust"
-        title="Secure billing through Stripe"
-        body="Payments are handled by Stripe. Manage your subscription, invoices, and payment methods from the dashboard billing page. We never store card details on our servers."
-        bullets={["Stripe Checkout for upgrades", "Customer portal for plan changes", "Usage meters reset monthly"]}
+        title="Secure billing through Paddle"
+        body="Payments are handled by Paddle, our merchant of record. Manage your subscription, invoices, and payment methods from the dashboard billing page. We never store card details on our servers."
+        bullets={["Paddle Checkout for upgrades", "Customer portal for plan changes", "Usage meters reset monthly"]}
         tone="dark"
         reverse
       />

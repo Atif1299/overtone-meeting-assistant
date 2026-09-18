@@ -13,7 +13,7 @@ const capabilities = [
   { iconKey: "rocket", title: "Bot launch", body: "One-click Recall.ai bot join with presenter output media as camera.", image: media.fragLaunch },
   { iconKey: "radio", title: "Live sessions", body: "Monitor bot state, transcript queue, and session health in real time.", image: media.fragSession },
   { iconKey: "sparkles", title: "Agent studio", body: "Version prompt instructions per workspace. Activate the tone that fits your brand.", image: media.fragAgent },
-  { iconKey: "billing", title: "Usage & billing", body: "Stripe subscriptions with monthly launch and upload quotas by plan.", image: media.fragBilling },
+  { iconKey: "billing", title: "Usage & billing", body: "Paddle subscriptions with monthly launch and upload quotas by plan.", image: media.fragBilling },
   { iconKey: "workspace", title: "Multi-tenant SaaS", body: "Isolated workspaces, Supabase auth, and per-tenant presentation catalogs.", image: media.fragWorkspace },
 ];
 
