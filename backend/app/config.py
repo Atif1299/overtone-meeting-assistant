@@ -18,7 +18,13 @@ class Settings(BaseSettings):
     frontend_url: str = "http://127.0.0.1:5175"
     cors_allowed_origins: str = (
         "http://127.0.0.1:5175,http://localhost:5175,"
-        "http://127.0.0.1:5176,http://localhost:5176"
+        "http://127.0.0.1:5176,http://localhost:5176,"
+        "https://deckvoice-v2-dashboard-4idrhaffca-uc.a.run.app,"
+        "https://deckvoice-v2-presenter-4idrhaffca-uc.a.run.app,"
+        "https://deckvoice-marketing-4idrhaffca-uc.a.run.app,"
+        "https://deckvoice-v2-dashboard-95044197271.us-central1.run.app,"
+        "https://deckvoice-v2-presenter-95044197271.us-central1.run.app,"
+        "https://deckvoice-marketing-95044197271.us-central1.run.app"
     )
     admin_api_key: str = ""
     # When true, dashboard/API routes accept unauthenticated demo traffic.
@@ -84,6 +90,50 @@ class Settings(BaseSettings):
 
     # Presenter URL signing
     presenter_token_secret: str = ""
+
+
+# Always allow local Vite + the canonical Cloud Run frontends, even if
+# CORS_ALLOWED_ORIGINS is wiped by a --set-env-vars deploy.
+CANONICAL_CORS_ORIGINS = (
+    "http://127.0.0.1:5175",
+    "http://localhost:5175",
+    "http://127.0.0.1:5176",
+    "http://localhost:5176",
+    "http://127.0.0.1:5177",
+    "http://localhost:5177",
+    "https://deckvoice-v2-dashboard-4idrhaffca-uc.a.run.app",
+    "https://deckvoice-v2-presenter-4idrhaffca-uc.a.run.app",
+    "https://deckvoice-marketing-4idrhaffca-uc.a.run.app",
+    "https://deckvoice-v2-dashboard-95044197271.us-central1.run.app",
+    "https://deckvoice-v2-presenter-95044197271.us-central1.run.app",
+    "https://deckvoice-marketing-95044197271.us-central1.run.app",
+    "https://overtone-dashboard-4idrhaffca-uc.a.run.app",
+)
+
+CLOUD_RUN_CORS_ORIGIN_REGEX = (
+    r"https://(?:deckvoice|overtone)[-a-z0-9]+\.(?:a\.run\.app|us-central1\.run\.app)"
+)
+
+
+def cors_origin_list(settings: Settings | None = None) -> list[str]:
+    s = settings or get_settings()
+    origins: list[str] = []
+    seen: set[str] = set()
+
+    def add(url: str) -> None:
+        cleaned = (url or "").strip().rstrip("/")
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            origins.append(cleaned)
+
+    for origin in s.cors_allowed_origins.split(","):
+        add(origin)
+    add(s.dashboard_url)
+    add(s.frontend_url)
+    add(s.marketing_url)
+    for origin in CANONICAL_CORS_ORIGINS:
+        add(origin)
+    return origins
 
 
 @lru_cache

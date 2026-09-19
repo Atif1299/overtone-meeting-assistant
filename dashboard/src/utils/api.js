@@ -54,6 +54,9 @@ async function apiFetch(endpoint, options = {}) {
     const err = await res.text();
     const requestError = new Error(err || "Request failed");
     requestError.status = res.status;
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("deckvoice:unauthorized"));
+    }
     throw requestError;
   }
 
@@ -122,7 +125,14 @@ async function request(path, init = {}, timeoutMs = API_TIMEOUT_MS) {
       headers: await buildHeaders(init.headers || {}),
       signal: controller?.signal,
     });
-    if (!response.ok) throw new Error(await parseError(response));
+    if (!response.ok) {
+      const err = new Error(await parseError(response));
+      err.status = response.status;
+      if (response.status === 401 && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("deckvoice:unauthorized"));
+      }
+      throw err;
+    }
     return response;
   } catch (error) {
     if (error?.name === "AbortError") {
