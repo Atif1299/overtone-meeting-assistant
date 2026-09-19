@@ -12,6 +12,7 @@ from app.domain.usage import usage_snapshot
 from app.domain.workspaces import bootstrap_user_workspace
 from app.http.auth import WorkspaceContext, get_workspace_context
 from app.http.billing import handle_paddle_webhook, verify_paddle_signature
+from app.http.paddle_ips import fetch_paddle_ipv4_cidrs, ip_in_cidrs, source_ip_from_request
 
 router = APIRouter(tags=["me"])
 
@@ -90,6 +91,11 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
     settings = get_settings()
     if not settings.paddle_webhook_secret:
         raise HTTPException(status_code=503, detail="Paddle webhook not configured")
+    source_ip = source_ip_from_request(request.headers.get("x-forwarded-for"))
+    if source_ip:
+        cidrs = fetch_paddle_ipv4_cidrs()
+        if cidrs and not ip_in_cidrs(source_ip, cidrs):
+            raise HTTPException(status_code=403, detail="Paddle webhook source not allowlisted")
     payload = await request.body()
     sig = request.headers.get("paddle-signature", "")
     if not verify_paddle_signature(payload, sig, settings.paddle_webhook_secret):
