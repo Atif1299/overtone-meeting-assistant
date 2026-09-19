@@ -13,6 +13,7 @@ from app.http.billing import (
     plan_from_paddle_payload,
     verify_paddle_signature,
 )
+from app.http.paddle_ips import ip_in_cidrs, source_ip_from_request
 
 STARTER_PRICE = "pri_01m2v77c4sfdjmp2xk4wbp7apb"
 PRO_PRICE = "pri_01m2v74zwdp5egjscr89dk906c"
@@ -171,6 +172,14 @@ def test_paddle_environment_from_api_base():
     assert paddle_environment("https://api.paddle.com") == "live"
 
 
+def test_paddle_source_ip_allowlist_helpers():
+    assert source_ip_from_request(None) is None
+    assert source_ip_from_request("34.237.3.244, 10.0.0.1") == "34.237.3.244"
+    cidrs = ["34.237.3.244/32", "10.0.0.0/8"]
+    assert ip_in_cidrs("34.237.3.244", cidrs) is True
+    assert ip_in_cidrs("203.0.113.10", cidrs) is False
+
+
 def test_paddle_webhook_route_rejects_bad_signature(monkeypatch):
     from fastapi.testclient import TestClient
 
@@ -194,5 +203,30 @@ def test_paddle_webhook_route_rejects_bad_signature(monkeypatch):
             )
             assert ok.status_code == 200
             assert ok.json()["ok"] is True
+
+            monkeypatch.setattr(
+                "app.http.me.fetch_paddle_ipv4_cidrs",
+                lambda: ["34.237.3.244/32"],
+            )
+            blocked = client.post(
+                "/webhooks/paddle",
+                content=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "Paddle-Signature": _sign(body),
+                    "X-Forwarded-For": "203.0.113.10",
+                },
+            )
+            assert blocked.status_code == 403
+            allowed = client.post(
+                "/webhooks/paddle",
+                content=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "Paddle-Signature": _sign(body),
+                    "X-Forwarded-For": "34.237.3.244",
+                },
+            )
+            assert allowed.status_code == 200
     finally:
         get_settings.cache_clear()
