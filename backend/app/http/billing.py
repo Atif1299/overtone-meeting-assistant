@@ -30,6 +30,7 @@ class CheckoutOut(BaseModel):
 class PaddleConfigOut(BaseModel):
     client_token: str
     environment: str
+    paddle_customer_id: str | None = None
 
 
 class PortalOut(BaseModel):
@@ -251,13 +252,23 @@ def create_checkout(
 
 
 @router.get("/paddle-config", response_model=PaddleConfigOut)
-def paddle_config(ctx: WorkspaceContext = Depends(get_workspace_context)):
+def paddle_config(
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
     settings = get_settings()
     if not settings.paddle_client_token:
         raise HTTPException(status_code=503, detail="Paddle client token not configured")
+    paddle_customer_id = None
+    if not ctx.is_operator:
+        sub = _get_or_create_subscription(db, ctx.workspace_id)
+        customer_id = sub.paddle_customer_id or ""
+        if customer_id.startswith("ctm_"):
+            paddle_customer_id = customer_id
     return PaddleConfigOut(
         client_token=settings.paddle_client_token,
         environment=paddle_environment(settings.paddle_api_base),
+        paddle_customer_id=paddle_customer_id,
     )
 
 

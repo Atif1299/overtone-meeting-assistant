@@ -34,7 +34,7 @@ function ensurePaddle(config) {
       if (config.environment === "sandbox") {
         window.Paddle.Environment.set("sandbox");
       }
-      window.Paddle.Initialize({
+      const init = {
         token: config.client_token,
         checkout: {
           settings: {
@@ -42,7 +42,11 @@ function ensurePaddle(config) {
           },
         },
         eventCallback: (event) => paddleEventHandler(event),
-      });
+      };
+      if (config.paddle_customer_id && String(config.paddle_customer_id).startsWith("ctm_")) {
+        init.pwCustomer = { id: config.paddle_customer_id };
+      }
+      window.Paddle.Initialize(init);
     });
   }
   return paddleInit;
