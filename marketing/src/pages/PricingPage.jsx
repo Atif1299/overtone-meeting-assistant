@@ -15,7 +15,7 @@ const plans = [
 ];
 
 const compareRows = [
-  { feature: "Bot launches / month", values: ["1", "5", "20"] },
+  { feature: "Bot launches / month", values: ["5", "5", "20"] },
   { feature: "Deck uploads / month", values: ["1", "3", "10"] },
   { feature: "Agent prompt studio", values: ["✓", "✓", "✓"] },
   { feature: "Paddle billing portal", values: ["—", "✓", "✓"] },
